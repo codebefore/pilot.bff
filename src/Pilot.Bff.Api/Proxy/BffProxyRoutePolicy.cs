@@ -90,7 +90,7 @@ public sealed class BffProxyRoutePolicy : IBffProxyRoutePolicy
         (string.Equals(method, "GET", StringComparison.OrdinalIgnoreCase) ||
          string.Equals(method, "HEAD", StringComparison.OrdinalIgnoreCase)) &&
         service == "platform" &&
-        segments is ["outbox", "health"] or ["health", "domain-events"];
+        segments is ["maintenance"] or ["outbox", "health"] or ["health", "domain-events"];
 
     private static bool IsAllowedServicePath(string service, string[] segments)
     {
