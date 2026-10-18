@@ -16,7 +16,7 @@ builder.Services
     .AddHealthChecks()
     .AddCheck<BffRuntimeReadinessHealthCheck>("bff_runtime", tags: ["ready"]);
 
-var forwardedHeadersEnabled = builder.Services.AddTrustedForwardedHeaders(builder.Configuration);
+var forwardedHeaders = builder.Services.AddTrustedForwardedHeaders(builder.Configuration);
 builder.Services.AddBffSessionInfrastructure(builder.Configuration);
 builder.Services.AddBffIdentityAuth(builder.Configuration);
 builder.Services.AddBffProxy(builder.Configuration);
@@ -39,9 +39,17 @@ builder.Services.AddSingleton<BffSessionCookie>();
 var app = builder.Build();
 _ = app.Services.GetRequiredService<DependencyTelemetry>();
 
-if (forwardedHeadersEnabled)
+if (forwardedHeaders.Enabled)
 {
     app.UseForwardedHeaders();
+    if (forwardedHeaders.ExternalScheme is not null)
+    {
+        app.Use((context, next) =>
+        {
+            context.Request.Scheme = forwardedHeaders.ExternalScheme;
+            return next(context);
+        });
+    }
 }
 
 app.UseMiddleware<RequestPerformanceMiddleware>();

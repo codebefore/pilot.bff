@@ -51,3 +51,4 @@ data:
   Bff__ForwardedHeaders__Enabled: {{ .Values.env.forwardedHeadersEnabled | quote }}
   Bff__ForwardedHeaders__KnownProxies: {{ .Values.env.forwardedHeadersKnownProxies | quote }}
   Bff__ForwardedHeaders__KnownNetworks: {{ .Values.env.forwardedHeadersKnownNetworks | quote }}
+  Bff__ForwardedHeaders__ExternalScheme: {{ .Values.env.forwardedHeadersExternalScheme | quote }}
