@@ -5,16 +5,23 @@ namespace Pilot.Bff.Api.Security;
 
 public static class ForwardedHeadersConfiguration
 {
-    public static bool AddTrustedForwardedHeaders(
+    public static ForwardedHeadersSetup AddTrustedForwardedHeaders(
         this IServiceCollection services,
         IConfiguration configuration)
     {
         var section = configuration.GetSection("Bff:ForwardedHeaders");
         var enabled = section.GetValue("Enabled", false);
+        var externalScheme = ParseExternalScheme(section["ExternalScheme"]);
 
         if (!enabled)
         {
-            return false;
+            if (externalScheme is not null)
+            {
+                throw new InvalidOperationException(
+                    "A forwarded external scheme requires trusted forwarded headers to be enabled.");
+            }
+
+            return new ForwardedHeadersSetup(false, null);
         }
 
         var knownProxies = ParseKnownProxies(section["KnownProxies"]);
@@ -45,7 +52,21 @@ public static class ForwardedHeadersConfiguration
             }
         });
 
-        return true;
+        return new ForwardedHeadersSetup(true, externalScheme);
+    }
+
+    private static string? ParseExternalScheme(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return null;
+        }
+
+        var scheme = value.Trim().ToLowerInvariant();
+        return scheme is "http" or "https"
+            ? scheme
+            : throw new InvalidOperationException(
+                $"Invalid forwarded external scheme: {value}");
     }
 
     private static List<IPAddress> ParseKnownProxies(string? value)
@@ -72,3 +93,5 @@ public static class ForwardedHeadersConfiguration
             .Split([',', ';'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
     }
 }
+
+public readonly record struct ForwardedHeadersSetup(bool Enabled, string? ExternalScheme);
