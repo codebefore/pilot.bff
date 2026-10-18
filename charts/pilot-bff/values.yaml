@@ -95,7 +95,9 @@ networkPolicy:
   ingressPodLabels:
     app.kubernetes.io/name: ingress-nginx
   applicationNamespace: ""
-  applicationPort: 80
+  # NetworkPolicy evaluates the destination pod port after Service DNAT.
+  # Pilot Gateway and Identity listen on container port 8080 behind port 80 Services.
+  applicationPort: 8080
   redisPort: 6379
   redisCidrs: []
   dnsNamespace: kube-system
