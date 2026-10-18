@@ -58,15 +58,20 @@ public sealed class BffProxyRoutePolicy : IBffProxyRoutePolicy
 
         var segments = (path ?? string.Empty)
             .Split('/', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        var explicitlyAllowedOperationalRead = IsExplicitlyAllowedOperationalRead(
+            method,
+            service,
+            segments);
         if (segments.Any(segment =>
                 string.IsNullOrWhiteSpace(segment) ||
                 ForbiddenSegments.Contains(segment) ||
-                segment.Any(char.IsControl)))
+                segment.Any(char.IsControl)) &&
+            !explicitlyAllowedOperationalRead)
         {
             return false;
         }
 
-        if (!IsAllowedServicePath(service, segments))
+        if (!explicitlyAllowedOperationalRead && !IsAllowedServicePath(service, segments))
         {
             return false;
         }
@@ -77,6 +82,15 @@ public sealed class BffProxyRoutePolicy : IBffProxyRoutePolicy
             : $"/v1/{service}/{encodedPath}";
         return true;
     }
+
+    private static bool IsExplicitlyAllowedOperationalRead(
+        string method,
+        string service,
+        string[] segments) =>
+        (string.Equals(method, "GET", StringComparison.OrdinalIgnoreCase) ||
+         string.Equals(method, "HEAD", StringComparison.OrdinalIgnoreCase)) &&
+        service == "platform" &&
+        segments is ["outbox", "health"] or ["health", "domain-events"];
 
     private static bool IsAllowedServicePath(string service, string[] segments)
     {

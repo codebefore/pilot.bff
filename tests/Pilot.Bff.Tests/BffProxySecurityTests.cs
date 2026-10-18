@@ -14,6 +14,8 @@ public sealed class BffProxySecurityTests
     [InlineData("GET", "identity", "users/123", "/v1/identity/users/123")]
     [InlineData("DELETE", "identity", "auth/sessions/123", "/v1/identity/auth/sessions/123")]
     [InlineData("GET", "platform", "notifications", "/v1/platform/notifications")]
+    [InlineData("GET", "platform", "outbox/health", "/v1/platform/outbox/health")]
+    [InlineData("HEAD", "platform", "health/domain-events", "/v1/platform/health/domain-events")]
     [InlineData("GET", "messaging", "hubs/messaging", "/v1/messaging/hubs/messaging")]
     [InlineData("POST", "messaging", "hubs/messaging/negotiate", "/v1/messaging/hubs/messaging/negotiate")]
     public void RoutePolicy_AllowsOnlyExplicitApplicationRoutes(
@@ -36,6 +38,9 @@ public sealed class BffProxySecurityTests
     [InlineData("GET", "Candidates", "123")]
     [InlineData("GET", "candidates", "internal/export")]
     [InlineData("GET", "training", "health")]
+    [InlineData("POST", "platform", "outbox/health")]
+    [InlineData("GET", "platform", "health/ready")]
+    [InlineData("GET", "candidates", "outbox/health")]
     [InlineData("POST", "identity", "auth/refresh")]
     [InlineData("POST", "identity", "auth/logout")]
     [InlineData("GET", "platform", "maintenance")]
