@@ -111,3 +111,12 @@ Proxy, upstream response header'ını en fazla `Bff:Proxy:TimeoutSeconds` içind
 Structured request logları yalnız endpoint route template'ini kullanır; ham path, query, header, cookie veya body kaydetmez. Her cevap `X-Pilot-Trace-Id` taşır ve request/dependency duration metrikleri üretir. Helm NetworkPolicy açıldığında ingress-nginx girişini; aynı namespace uygulama servisleri, tanımlı Redis CIDR'ları ve DNS çıkışını allowlist eder.
 
 Mimari ve rollout planı `pilot.context/03-uygulama/bff-ve-ai-guvenlik-plani.md` belgesindedir.
+
+## Image Yayını
+
+`.github/workflows/publish-image.yml` yalnız `main` branch'inde manuel olarak
+çalıştırılabilir. Workflow önce gerçek Redis entegrasyon testleri, format/build
+kontrolü ve Helm doğrulamasını tamamlar; ardından yalnız
+`ghcr.io/codebefore/pilot-bff:sha-<40-karakter-commit>` immutable image'ını
+yayınlar. Herhangi bir cluster deploy'u, GitOps değişikliği, SSH veya production
+sync adımı içermez.
