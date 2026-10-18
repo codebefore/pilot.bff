@@ -1,0 +1,12 @@
+**/.git
+**/.vs
+**/.vscode
+**/bin
+**/obj
+**/TestResults
+.env
+.env.*
+!.env.example
+account.md
+docker-compose.yml
+README.md

@@ -1,0 +1,6 @@
+apiVersion: v2
+name: pilot-bff
+description: Pilot browser session and API access boundary
+type: application
+version: 0.1.0
+appVersion: "0.1.0"

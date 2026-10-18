@@ -1,0 +1,53 @@
+{{- $sessionEnabled := eq (lower (toString .Values.env.sessionEnabled)) "true" -}}
+{{- $proxyEnabled := eq (lower (toString .Values.env.proxyEnabled)) "true" -}}
+{{- if and $proxyEnabled (not $sessionEnabled) -}}
+{{- fail "env.sessionEnabled must be true when the BFF proxy is enabled" -}}
+{{- end -}}
+{{- if and $sessionEnabled (ne (lower (toString .Values.env.redisEnabled)) "true") -}}
+{{- fail "env.redisEnabled must be true when BFF sessions are enabled" -}}
+{{- end -}}
+{{- if and $sessionEnabled (empty .Values.sessionSecrets.existingSecret) -}}
+{{- fail "sessionSecrets.existingSecret is required when BFF sessions are enabled" -}}
+{{- end -}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "pilot-bff.fullname" . }}
+  labels:
+    {{- include "pilot-bff.labels" . | nindent 4 }}
+data:
+  ASPNETCORE_ENVIRONMENT: {{ .Values.env.aspnetcoreEnvironment | quote }}
+  ASPNETCORE_URLS: "http://+:8080"
+  AllowedHosts: {{ .Values.env.allowedHosts | quote }}
+  TZ: {{ .Values.env.timeZone | quote }}
+  Performance__ServiceName: {{ .Values.env.performanceServiceName | quote }}
+  Performance__SlowRequestMs: {{ .Values.env.performanceSlowRequestMs | quote }}
+  Performance__SlowDependencyMs: {{ .Values.env.performanceSlowDependencyMs | quote }}
+  Bff__Session__Enabled: {{ .Values.env.sessionEnabled | quote }}
+  Bff__Session__CookieName: {{ .Values.env.sessionCookieName | quote }}
+  Bff__Session__IdleTimeoutMinutes: {{ .Values.env.sessionIdleTimeoutMinutes | quote }}
+  Bff__Session__AbsoluteTimeoutHours: {{ .Values.env.sessionAbsoluteTimeoutHours | quote }}
+  Bff__Session__AccessTokenRefreshSkewSeconds: {{ .Values.env.sessionAccessTokenRefreshSkewSeconds | quote }}
+  Bff__Session__ActivityRenewalMinutes: {{ .Values.env.sessionActivityRenewalMinutes | quote }}
+  Bff__Session__RefreshLockLeaseSeconds: {{ .Values.env.sessionRefreshLockLeaseSeconds | quote }}
+  Bff__Session__RefreshLockWaitMilliseconds: {{ .Values.env.sessionRefreshLockWaitMilliseconds | quote }}
+  Bff__Proxy__Enabled: {{ .Values.env.proxyEnabled | quote }}
+  Bff__Proxy__GatewayBaseUrl: {{ .Values.env.proxyGatewayBaseUrl | quote }}
+  Bff__Proxy__TimeoutSeconds: {{ .Values.env.proxyTimeoutSeconds | quote }}
+  Bff__Proxy__ResponseStreamingTimeoutSeconds: {{ .Values.env.proxyResponseStreamingTimeoutSeconds | quote }}
+  Bff__Proxy__MaxRequestBodyBytes: {{ .Values.env.proxyMaxRequestBodyBytes | quote }}
+  Bff__Proxy__DocumentUploadMaxRequestBodyBytes: {{ .Values.env.proxyDocumentUploadMaxRequestBodyBytes | quote }}
+  Bff__Proxy__InstructorDocumentUploadMaxRequestBodyBytes: {{ .Values.env.proxyInstructorDocumentUploadMaxRequestBodyBytes | quote }}
+  Bff__Proxy__ReadRequestsPerMinute: {{ .Values.env.proxyReadRequestsPerMinute | quote }}
+  Bff__Proxy__MutationRequestsPerMinute: {{ .Values.env.proxyMutationRequestsPerMinute | quote }}
+  Bff__Proxy__ReadConcurrentRequests: {{ .Values.env.proxyReadConcurrentRequests | quote }}
+  Bff__Proxy__MutationConcurrentRequests: {{ .Values.env.proxyMutationConcurrentRequests | quote }}
+  Redis__Enabled: {{ .Values.env.redisEnabled | quote }}
+  Redis__InstanceName: {{ .Values.env.redisInstanceName | quote }}
+  Redis__EnvironmentName: {{ .Values.env.redisEnvironmentName | quote }}
+  Identity__BaseUrl: {{ .Values.env.identityBaseUrl | quote }}
+  Identity__TimeoutSeconds: {{ .Values.env.identityTimeoutSeconds | quote }}
+  Bff__BrowserSecurity__AllowedOrigins__0: {{ .Values.env.browserAllowedOrigin | quote }}
+  Bff__ForwardedHeaders__Enabled: {{ .Values.env.forwardedHeadersEnabled | quote }}
+  Bff__ForwardedHeaders__KnownProxies: {{ .Values.env.forwardedHeadersKnownProxies | quote }}
+  Bff__ForwardedHeaders__KnownNetworks: {{ .Values.env.forwardedHeadersKnownNetworks | quote }}
