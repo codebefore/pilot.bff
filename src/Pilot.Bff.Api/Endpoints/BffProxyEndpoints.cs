@@ -44,6 +44,7 @@ public static class BffProxyEndpoints
         IBffProxyTrafficLimiter trafficLimiter,
         IBffWebSocketProxy webSocketProxy,
         IHttpClientFactory httpClientFactory,
+        ILoggerFactory loggerFactory,
         IOptions<BffProxyOptions> proxyOptions,
         CancellationToken cancellationToken)
     {
@@ -51,6 +52,9 @@ public static class BffProxyEndpoints
             context.Request.QueryString.Value?.Length > 4096 ||
             !queryPolicy.IsSafe(context.Request.Query))
         {
+            SecurityEventLog.Rejected(
+                loggerFactory.CreateLogger("Pilot.Bff.Security"),
+                "proxy_route_rejected");
             return Results.NotFound();
         }
 
@@ -89,6 +93,9 @@ public static class BffProxyEndpoints
             cancellationToken);
         if (trafficLease is null)
         {
+            SecurityEventLog.Rejected(
+                loggerFactory.CreateLogger("Pilot.Bff.Security"),
+                "proxy_rate_limited");
             context.Response.Headers.RetryAfter = "1";
             return Results.StatusCode(StatusCodes.Status429TooManyRequests);
         }

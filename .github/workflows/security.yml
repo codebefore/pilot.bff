@@ -1,0 +1,61 @@
+name: BFF Scheduled Security Verification
+run-name: BFF security verification · ${{ github.event_name }}
+
+on:
+  schedule:
+    - cron: "17 2 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: bff-security-verification
+  cancel-in-progress: false
+
+jobs:
+  security-regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      redis:
+        image: redis:7-alpine
+        ports: ["6379:6379"]
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      BFF_TEST_REDIS_CONNECTION: localhost:6379,abortConnect=false
+      BFF_TEST_REDIS_OUTAGE_CONNECTION: localhost:6399,abortConnect=false,connectTimeout=500,syncTimeout=500
+    steps:
+      - name: Checkout
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Restore
+        run: dotnet restore Pilot.Bff.sln
+
+      - name: Verify formatting
+        run: dotnet format Pilot.Bff.sln --verify-no-changes --no-restore
+
+      - name: Session theft, XSS surface and malicious proxy regressions
+        run: dotnet test Pilot.Bff.sln --configuration Release --no-restore
+
+      - name: Vulnerable dependency audit
+        run: |
+          set -euo pipefail
+          dotnet package list --project src/Pilot.Bff.Api/Pilot.Bff.Api.csproj \
+            --vulnerable --include-transitive --format json --no-restore \
+            | jq -e '([.. | objects | .vulnerabilities? // empty] | flatten | length) == 0'
+
+      - name: Set up Helm
+        uses: azure/setup-helm@1a275c3b69536ee54be43f2070a358922e12c8d4 # v4
+
+      - name: Deployment policy validation
+        run: helm lint charts/pilot-bff
