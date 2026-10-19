@@ -80,8 +80,7 @@ public static class BffProxyEndpoints
         }
 
         cookie.Append(context.Response, authorization.SessionId!, authorization.Value.IdleExpiresAtUtc);
-        var mutation = !HttpMethods.IsGet(context.Request.Method) &&
-            !HttpMethods.IsHead(context.Request.Method);
+        var mutation = routePolicy.IsMutation(context.Request.Method, targetPath);
         await using var trafficLease = await trafficLimiter.TryAcquireAsync(
             authorization.Value.UserId,
             authorization.Value.InstitutionId,

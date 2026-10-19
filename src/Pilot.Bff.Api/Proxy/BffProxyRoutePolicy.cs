@@ -3,10 +3,14 @@ namespace Pilot.Bff.Api.Proxy;
 public interface IBffProxyRoutePolicy
 {
     bool TryResolve(string method, string service, string? path, out string targetPath);
+    bool IsMutation(string method, string targetPath);
 }
 
 public sealed class BffProxyRoutePolicy : IBffProxyRoutePolicy
 {
+    private const string PracticeLessonSummaryQueryPath =
+        "/v1/training/practice-candidates/lesson-summaries/query";
+
     private static readonly HashSet<string> AllowedMethods =
         new(StringComparer.OrdinalIgnoreCase) { "GET", "HEAD", "POST", "PUT", "PATCH", "DELETE" };
 
@@ -82,6 +86,12 @@ public sealed class BffProxyRoutePolicy : IBffProxyRoutePolicy
             : $"/v1/{service}/{encodedPath}";
         return true;
     }
+
+    public bool IsMutation(string method, string targetPath) =>
+        !HttpMethods.IsGet(method) &&
+        !HttpMethods.IsHead(method) &&
+        !(HttpMethods.IsPost(method) &&
+          string.Equals(targetPath, PracticeLessonSummaryQueryPath, StringComparison.Ordinal));
 
     private static bool IsExplicitlyAllowedOperationalRead(
         string method,
