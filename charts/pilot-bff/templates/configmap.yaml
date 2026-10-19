@@ -52,3 +52,7 @@ data:
   Bff__ForwardedHeaders__KnownProxies: {{ .Values.env.forwardedHeadersKnownProxies | quote }}
   Bff__ForwardedHeaders__KnownNetworks: {{ .Values.env.forwardedHeadersKnownNetworks | quote }}
   Bff__ForwardedHeaders__ExternalScheme: {{ .Values.env.forwardedHeadersExternalScheme | quote }}
+  ReleaseGrant__Enabled: {{ default .Values.env.sessionEnabled .Values.env.releaseGrantEnabled | quote }}
+  ReleaseGrant__Issuer: {{ .Values.env.releaseGrantIssuer | quote }}
+  ReleaseGrant__Audience: {{ .Values.env.releaseGrantAudience | quote }}
+  ReleaseGrant__LifetimeSeconds: {{ .Values.env.releaseGrantLifetimeSeconds | quote }}

@@ -63,6 +63,10 @@ env:
   forwardedHeadersKnownProxies: ""
   forwardedHeadersKnownNetworks: ""
   forwardedHeadersExternalScheme: ""
+  releaseGrantEnabled: ""
+  releaseGrantIssuer: pilot-bff
+  releaseGrantAudience: pilot-release-control
+  releaseGrantLifetimeSeconds: "60"
 
 sessionSecrets:
   existingSecret: ""
@@ -70,6 +74,7 @@ sessionSecrets:
   redisKeyPepperKey: Redis__KeyPepper
   dataProtectionCertificateBase64Key: Bff__DataProtection__CertificateBase64
   dataProtectionCertificatePasswordKey: Bff__DataProtection__CertificatePassword
+  releaseGrantSigningKeyKey: ReleaseGrant__SigningKey
   dataProtectionPreviousCertificateBase64Key: ""
   dataProtectionPreviousCertificatePasswordKey: ""
 

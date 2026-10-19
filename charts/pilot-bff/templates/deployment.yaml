@@ -1,3 +1,4 @@
+{{- $releaseGrantEnabled := eq (lower (toString (default .Values.env.sessionEnabled .Values.env.releaseGrantEnabled))) "true" -}}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -69,6 +70,13 @@ spec:
                 secretKeyRef:
                   name: {{ . }}
                   key: {{ $.Values.sessionSecrets.dataProtectionCertificatePasswordKey }}
+            {{- if $releaseGrantEnabled }}
+            - name: ReleaseGrant__SigningKey
+              valueFrom:
+                secretKeyRef:
+                  name: {{ . }}
+                  key: {{ $.Values.sessionSecrets.releaseGrantSigningKeyKey }}
+            {{- end }}
             {{- if $.Values.sessionSecrets.dataProtectionPreviousCertificateBase64Key }}
             - name: Bff__DataProtection__PreviousCertificateBase64
               valueFrom:

@@ -66,3 +66,5 @@ public sealed record IdentityMigrationAccessResponse(
 public sealed record BffMigrationAccessResponse(DateTime ExpiresAtUtc);
 
 public sealed record AntiforgeryTokenResponse(string Token);
+
+public sealed record ReleaseGrantResponse(string Token, DateTime ExpiresAtUtc);

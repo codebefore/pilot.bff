@@ -16,6 +16,8 @@ public static class BffAuthEndpoints
 
         group.MapGet("/antiforgery", GetAntiforgeryToken);
         group.MapGet("/session", GetSessionAsync);
+        group.MapPost("/release-grant", IssueReleaseGrantAsync)
+            .AddEndpointFilter<AntiforgeryEndpointFilter>();
 
         group.MapPost("/auth/otp/request", RequestLoginCodeAsync)
             .AddEndpointFilter<AntiforgeryEndpointFilter>();
@@ -31,6 +33,25 @@ public static class BffAuthEndpoints
             .AddEndpointFilter<AntiforgeryEndpointFilter>();
 
         return endpoints;
+    }
+
+    private static async Task<IResult> IssueReleaseGrantAsync(
+        HttpContext context,
+        ReleaseGrantService grants,
+        BffSessionCookie cookie,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var result = await grants.IssueAsync(cookie.Read(context.Request), cancellationToken);
+            if (result.StatusCode == HttpStatusCode.Unauthorized)
+                cookie.Delete(context.Response);
+            return result.Value is not null ? Results.Ok(result.Value) : Status(result.StatusCode);
+        }
+        catch (Exception exception) when (IsDependencyFailure(exception, cancellationToken))
+        {
+            return DependencyUnavailable();
+        }
     }
 
     private static async Task<IResult> RequestMigrationAccessCodeAsync(

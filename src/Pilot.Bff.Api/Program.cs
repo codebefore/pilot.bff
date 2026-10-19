@@ -35,6 +35,16 @@ builder.Services.AddTransient<SessionEnabledEndpointFilter>();
 builder.Services.AddTransient<AntiforgeryEndpointFilter>();
 builder.Services.AddScoped<BffAuthService>();
 builder.Services.AddSingleton<BffSessionCookie>();
+builder.Services.AddOptions<ReleaseGrantOptions>()
+    .Bind(builder.Configuration.GetSection(ReleaseGrantOptions.SectionName))
+    .Validate(options => !options.Enabled ||
+        options.SigningKey.Length >= 32 &&
+        !string.IsNullOrWhiteSpace(options.Issuer) &&
+        !string.IsNullOrWhiteSpace(options.Audience) &&
+        options.LifetimeSeconds is >= 30 and <= 120,
+        "Enabled release grants require a 32-character signing key, issuer, audience and a 30-120 second lifetime.")
+    .ValidateOnStart();
+builder.Services.AddScoped<ReleaseGrantService>();
 
 var app = builder.Build();
 _ = app.Services.GetRequiredService<DependencyTelemetry>();
