@@ -39,17 +39,27 @@ public static class BffAuthEndpoints
         HttpContext context,
         ReleaseGrantService grants,
         BffSessionCookie cookie,
+        ILoggerFactory loggerFactory,
         CancellationToken cancellationToken)
     {
         try
         {
             var result = await grants.IssueAsync(cookie.Read(context.Request), cancellationToken);
+            if (result.StatusCode != HttpStatusCode.OK)
+            {
+                SecurityEventLog.Rejected(
+                    loggerFactory.CreateLogger("Pilot.Bff.Security"),
+                    "release_grant_rejected");
+            }
             if (result.StatusCode == HttpStatusCode.Unauthorized)
                 cookie.Delete(context.Response);
             return result.Value is not null ? Results.Ok(result.Value) : Status(result.StatusCode);
         }
         catch (Exception exception) when (IsDependencyFailure(exception, cancellationToken))
         {
+            SecurityEventLog.Rejected(
+                loggerFactory.CreateLogger("Pilot.Bff.Security"),
+                "release_grant_unavailable");
             return DependencyUnavailable();
         }
     }

@@ -5,7 +5,8 @@ namespace Pilot.Bff.Api.Security;
 
 public sealed class BrowserRequestSecurityMiddleware(
     RequestDelegate next,
-    IOptions<BffBrowserSecurityOptions> options)
+    IOptions<BffBrowserSecurityOptions> options,
+    ILogger<BrowserRequestSecurityMiddleware> logger)
 {
     private static readonly HashSet<string> SafeMethods = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -32,6 +33,7 @@ public sealed class BrowserRequestSecurityMiddleware(
 
         if (!allowed || !fetchSiteAllowed)
         {
+            SecurityEventLog.Rejected(logger, "origin_rejected");
             context.Response.StatusCode = StatusCodes.Status403Forbidden;
             await context.Response.WriteAsJsonAsync(new
             {

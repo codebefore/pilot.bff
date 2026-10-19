@@ -18,7 +18,9 @@ public sealed class SessionEnabledEndpointFilter(IOptions<BffSessionOptions> opt
     }
 }
 
-public sealed class AntiforgeryEndpointFilter(IAntiforgery antiforgery) : IEndpointFilter
+public sealed class AntiforgeryEndpointFilter(
+    IAntiforgery antiforgery,
+    ILogger<AntiforgeryEndpointFilter> logger) : IEndpointFilter
 {
     public async ValueTask<object?> InvokeAsync(
         EndpointFilterInvocationContext context,
@@ -39,6 +41,7 @@ public sealed class AntiforgeryEndpointFilter(IAntiforgery antiforgery) : IEndpo
         }
         catch (AntiforgeryValidationException)
         {
+            SecurityEventLog.Rejected(logger, "csrf_rejected");
             return Results.Problem(
                 statusCode: StatusCodes.Status400BadRequest,
                 title: "Antiforgery validation failed.");
