@@ -94,16 +94,16 @@ public static class BffSessionInfrastructure
                 "Bff:Session:CookieName must be __Host-pilot_session.");
         }
 
-        if (session.IdleTimeoutMinutes is < 5 or > 240)
+        if (session.IdleTimeoutMinutes is < 5 or > 10080)
         {
             throw new InvalidOperationException(
-                "Bff:Session:IdleTimeoutMinutes must be between 5 and 240.");
+                "Bff:Session:IdleTimeoutMinutes must be between 5 and 10080.");
         }
 
-        if (session.AbsoluteTimeoutHours is < 1 or > 24)
+        if (session.AbsoluteTimeoutHours is < 1 or > 168)
         {
             throw new InvalidOperationException(
-                "Bff:Session:AbsoluteTimeoutHours must be between 1 and 24.");
+                "Bff:Session:AbsoluteTimeoutHours must be between 1 and 168.");
         }
 
         if (TimeSpan.FromMinutes(session.IdleTimeoutMinutes) >

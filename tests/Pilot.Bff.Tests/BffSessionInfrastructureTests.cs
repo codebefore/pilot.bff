@@ -2,6 +2,8 @@ using Microsoft.AspNetCore.DataProtection;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
+using System.Security.Cryptography;
+using System.Security.Cryptography.X509Certificates;
 using Pilot.Bff.Api.Contracts;
 using Pilot.Bff.Api.Options;
 using Pilot.Bff.Api.Session;
@@ -25,6 +27,30 @@ public sealed class BffSessionInfrastructureTests
             services.AddBffSessionInfrastructure(configuration));
 
         Assert.Contains("require Redis", exception.Message);
+    }
+
+    [Fact]
+    public void SessionInfrastructure_AcceptsSevenDaySessionPolicy()
+    {
+        const string password = "test-password";
+        using var certificate = CreateCertificate();
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["Bff:Session:Enabled"] = "true",
+                ["Bff:Session:IdleTimeoutMinutes"] = "10080",
+                ["Bff:Session:AbsoluteTimeoutHours"] = "168",
+                ["Redis:Enabled"] = "true",
+                ["Redis:ConnectionString"] = "localhost:6379,abortConnect=false",
+                ["Redis:KeyPepper"] = new string('p', 32),
+                ["Bff:DataProtection:CertificateBase64"] = Convert.ToBase64String(
+                    certificate.Export(X509ContentType.Pkcs12, password)),
+                ["Bff:DataProtection:CertificatePassword"] = password
+            })
+            .Build();
+        var services = new ServiceCollection();
+
+        services.AddBffSessionInfrastructure(configuration);
     }
 
     [Fact]
@@ -98,5 +124,18 @@ public sealed class BffSessionInfrastructureTests
             now,
             now.AddMinutes(30),
             now.AddHours(12));
+    }
+
+    private static X509Certificate2 CreateCertificate()
+    {
+        using var rsa = RSA.Create(2048);
+        var request = new CertificateRequest(
+            "CN=pilot-bff-tests",
+            rsa,
+            HashAlgorithmName.SHA256,
+            RSASignaturePadding.Pkcs1);
+        return request.CreateSelfSigned(
+            DateTimeOffset.UtcNow.AddMinutes(-1),
+            DateTimeOffset.UtcNow.AddDays(1));
     }
 }
