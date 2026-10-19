@@ -61,6 +61,23 @@ public sealed class BffProxySecurityTests
         Assert.False(policy.TryResolve(method, service, path, out _));
     }
 
+    [Theory]
+    [InlineData("GET", "/v1/training/practice-candidates", false)]
+    [InlineData("HEAD", "/v1/training/practice-candidates", false)]
+    [InlineData("POST", "/v1/training/practice-candidates/lesson-summaries/query", false)]
+    [InlineData("POST", "/v1/training/practice-candidates/lesson-summaries", true)]
+    [InlineData("POST", "/v1/training/practice-candidates/lesson-summaries/query/other", true)]
+    [InlineData("PUT", "/v1/training/practice-candidates/lesson-summaries/query", true)]
+    public void RoutePolicy_ClassifiesOnlyTheExactLessonSummaryQueryAsRead(
+        string method,
+        string targetPath,
+        bool expectedMutation)
+    {
+        var policy = new BffProxyRoutePolicy();
+
+        Assert.Equal(expectedMutation, policy.IsMutation(method, targetPath));
+    }
+
     [Fact]
     public void RequestFactory_StripsBrowserCredentialsAndAddsServerSessionAuthority()
     {
