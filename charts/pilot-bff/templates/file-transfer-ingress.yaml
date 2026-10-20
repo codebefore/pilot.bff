@@ -1,0 +1,45 @@
+{{- if and .Values.ingress.enabled .Values.ingress.fileTransferRateLimitBypass.enabled -}}
+{{- if empty .Values.ingress.fileTransferRateLimitBypass.paths -}}
+{{- fail "ingress.fileTransferRateLimitBypass.paths is required when the bypass ingress is enabled" -}}
+{{- end -}}
+{{- $root := . -}}
+{{- $annotations := deepCopy .Values.ingress.annotations -}}
+{{- $_ := set $annotations "nginx.ingress.kubernetes.io/proxy-body-size" (toString .Values.ingress.proxyBodySize) -}}
+{{- $_ := set $annotations "nginx.ingress.kubernetes.io/use-regex" "true" -}}
+{{- $_ := unset $annotations "nginx.ingress.kubernetes.io/limit-rps" -}}
+{{- $_ := unset $annotations "nginx.ingress.kubernetes.io/limit-burst-multiplier" -}}
+{{- $_ := unset $annotations "nginx.ingress.kubernetes.io/limit-connections" -}}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "pilot-bff.fullname" . }}-file-transfers
+  labels:
+    {{- include "pilot-bff.labels" . | nindent 4 }}
+  {{- with $annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  {{- with .Values.ingress.className }}
+  ingressClassName: {{ . }}
+  {{- end }}
+  {{- with .Values.ingress.tls }}
+  tls:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  rules:
+    {{- range .Values.ingress.hosts }}
+    - host: {{ .host | quote }}
+      http:
+        paths:
+          {{- range $root.Values.ingress.fileTransferRateLimitBypass.paths }}
+          - path: {{ . | quote }}
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: {{ include "pilot-bff.fullname" $root }}
+                port:
+                  name: http
+          {{- end }}
+    {{- end }}
+{{- end }}

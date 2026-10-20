@@ -89,6 +89,9 @@ ingress:
     requestsPerSecond: 10
     burstMultiplier: 3
     connections: 20
+  fileTransferRateLimitBypass:
+    enabled: false
+    paths: []
   hosts:
     - host: app.pilotyanimda.com
       paths:
