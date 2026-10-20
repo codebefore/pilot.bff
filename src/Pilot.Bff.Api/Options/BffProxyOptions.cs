@@ -25,4 +25,6 @@ public sealed class BffProxyOptions
     public int ReadConcurrentRequests { get; init; } = 50;
 
     public int MutationConcurrentRequests { get; init; } = 10;
+
+    public int FileTransferConcurrentRequests { get; init; } = 200;
 }

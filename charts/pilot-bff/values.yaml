@@ -53,6 +53,7 @@ env:
   proxyMutationRequestsPerMinute: "30"
   proxyReadConcurrentRequests: "50"
   proxyMutationConcurrentRequests: "10"
+  proxyFileTransferConcurrentRequests: "200"
   redisEnabled: "false"
   redisInstanceName: pilot
   redisEnvironmentName: production

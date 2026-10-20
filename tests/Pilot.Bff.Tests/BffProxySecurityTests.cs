@@ -62,23 +62,35 @@ public sealed class BffProxySecurityTests
     }
 
     [Theory]
-    [InlineData("GET", "/v1/training/practice-candidates", false)]
-    [InlineData("HEAD", "/v1/training/practice-candidates", false)]
-    [InlineData("POST", "/v1/training/practice-candidates/lesson-summaries/query", false)]
-    [InlineData("POST", "/v1/document/documents/candidate-photos", false)]
-    [InlineData("POST", "/v1/training/practice-candidates/lesson-summaries", true)]
-    [InlineData("POST", "/v1/training/practice-candidates/lesson-summaries/query/other", true)]
-    [InlineData("POST", "/v1/document/documents/candidate-photos/other", true)]
-    [InlineData("PUT", "/v1/training/practice-candidates/lesson-summaries/query", true)]
-    [InlineData("PUT", "/v1/document/documents/candidate-photos", true)]
-    public void RoutePolicy_ClassifiesOnlyExactReadOnlyPostPathsAsRead(
+    [InlineData("GET", "/v1/training/practice-candidates", BffProxyTrafficKind.Read)]
+    [InlineData("HEAD", "/v1/training/practice-candidates", BffProxyTrafficKind.Read)]
+    [InlineData("POST", "/v1/training/practice-candidates/lesson-summaries/query", BffProxyTrafficKind.Read)]
+    [InlineData("POST", "/v1/document/documents/candidate-photos", BffProxyTrafficKind.Read)]
+    [InlineData("POST", "/v1/training/practice-candidates/lesson-summaries", BffProxyTrafficKind.Mutation)]
+    [InlineData("POST", "/v1/training/practice-candidates/lesson-summaries/query/other", BffProxyTrafficKind.Mutation)]
+    [InlineData("POST", "/v1/document/documents/candidate-photos/other", BffProxyTrafficKind.Mutation)]
+    [InlineData("PUT", "/v1/training/practice-candidates/lesson-summaries/query", BffProxyTrafficKind.Mutation)]
+    [InlineData("PUT", "/v1/document/documents/candidate-photos", BffProxyTrafficKind.Mutation)]
+    [InlineData("GET", "/v1/document/candidates/11111111-1111-1111-1111-111111111111/documents/22222222-2222-2222-2222-222222222222/download", BffProxyTrafficKind.FileTransfer)]
+    [InlineData("HEAD", "/v1/document/vehicles/11111111-1111-1111-1111-111111111111/documents/22222222-2222-2222-2222-222222222222/download", BffProxyTrafficKind.FileTransfer)]
+    [InlineData("GET", "/v1/document/instructors/11111111-1111-1111-1111-111111111111/assignments/22222222-2222-2222-2222-222222222222/documents/33333333-3333-3333-3333-333333333333/file", BffProxyTrafficKind.FileTransfer)]
+    [InlineData("GET", "/v1/document/correspondence/11111111-1111-1111-1111-111111111111/files/22222222-2222-2222-2222-222222222222/download", BffProxyTrafficKind.FileTransfer)]
+    [InlineData("GET", "/v1/document/correspondence/11111111-1111-1111-1111-111111111111/packet-pdf", BffProxyTrafficKind.FileTransfer)]
+    [InlineData("GET", "/v1/document/legislation/documents/11111111-1111-1111-1111-111111111111/files/22222222-2222-2222-2222-222222222222/download", BffProxyTrafficKind.FileTransfer)]
+    [InlineData("GET", "/v1/training/instructors/11111111-1111-1111-1111-111111111111/photo", BffProxyTrafficKind.FileTransfer)]
+    [InlineData("GET", "/v1/platform/institution-settings/logo/file", BffProxyTrafficKind.FileTransfer)]
+    [InlineData("GET", "/v1/platform/institution-backups/11111111-1111-1111-1111-111111111111/download", BffProxyTrafficKind.FileTransfer)]
+    [InlineData("POST", "/v1/document/candidates/11111111-1111-1111-1111-111111111111/documents/22222222-2222-2222-2222-222222222222/download", BffProxyTrafficKind.Mutation)]
+    [InlineData("GET", "/v1/document/candidates/not-a-guid/documents/22222222-2222-2222-2222-222222222222/download", BffProxyTrafficKind.Read)]
+    [InlineData("GET", "/v1/document/candidates/11111111-1111-1111-1111-111111111111/documents/22222222-2222-2222-2222-222222222222/download/extra", BffProxyTrafficKind.Read)]
+    public void RoutePolicy_ClassifiesTrafficByExactMethodAndPath(
         string method,
         string targetPath,
-        bool expectedMutation)
+        BffProxyTrafficKind expectedTrafficKind)
     {
         var policy = new BffProxyRoutePolicy();
 
-        Assert.Equal(expectedMutation, policy.IsMutation(method, targetPath));
+        Assert.Equal(expectedTrafficKind, policy.ClassifyTraffic(method, targetPath));
     }
 
     [Fact]
@@ -187,14 +199,17 @@ public sealed class BffProxySecurityTests
         using var limiter = CreateTrafficLimiter(time, readRate: 1, readConcurrency: 2);
         var userId = Guid.NewGuid();
 
-        await using var first = await limiter.TryAcquireAsync(userId, null, null, false, default);
-        var rejected = await limiter.TryAcquireAsync(userId, null, null, false, default);
+        await using var first = await limiter.TryAcquireAsync(
+            userId, null, null, BffProxyTrafficKind.Read, default);
+        var rejected = await limiter.TryAcquireAsync(
+            userId, null, null, BffProxyTrafficKind.Read, default);
 
         Assert.NotNull(first);
         Assert.Null(rejected);
 
         time.Advance(TimeSpan.FromMinutes(1));
-        await using var afterWindow = await limiter.TryAcquireAsync(userId, null, null, false, default);
+        await using var afterWindow = await limiter.TryAcquireAsync(
+            userId, null, null, BffProxyTrafficKind.Read, default);
         Assert.NotNull(afterWindow);
     }
 
@@ -206,15 +221,51 @@ public sealed class BffProxySecurityTests
             readRate: 10,
             readConcurrency: 1);
         var userId = Guid.NewGuid();
-        var first = await limiter.TryAcquireAsync(userId, null, null, false, default);
+        var first = await limiter.TryAcquireAsync(
+            userId, null, null, BffProxyTrafficKind.Read, default);
 
-        var rejected = await limiter.TryAcquireAsync(userId, null, null, false, default);
+        var rejected = await limiter.TryAcquireAsync(
+            userId, null, null, BffProxyTrafficKind.Read, default);
         Assert.NotNull(first);
         Assert.Null(rejected);
 
         await first.DisposeAsync();
-        await using var afterRelease = await limiter.TryAcquireAsync(userId, null, null, false, default);
+        await using var afterRelease = await limiter.TryAcquireAsync(
+            userId, null, null, BffProxyTrafficKind.Read, default);
         Assert.NotNull(afterRelease);
+    }
+
+    [Fact]
+    public async Task TrafficLimiter_FileTransfersBypassRateWindowAndUseSeparateConcurrency()
+    {
+        using var limiter = CreateTrafficLimiter(
+            new TestTimeProvider(DateTimeOffset.UtcNow),
+            readRate: 1,
+            readConcurrency: 1,
+            fileTransferConcurrency: 2);
+        var userId = Guid.NewGuid();
+
+        var firstFile = await limiter.TryAcquireAsync(
+            userId, null, null, BffProxyTrafficKind.FileTransfer, default);
+        var secondFile = await limiter.TryAcquireAsync(
+            userId, null, null, BffProxyTrafficKind.FileTransfer, default);
+        var rejectedFile = await limiter.TryAcquireAsync(
+            userId, null, null, BffProxyTrafficKind.FileTransfer, default);
+        await using var firstRead = await limiter.TryAcquireAsync(
+            userId, null, null, BffProxyTrafficKind.Read, default);
+
+        Assert.NotNull(firstFile);
+        Assert.NotNull(secondFile);
+        Assert.Null(rejectedFile);
+        Assert.NotNull(firstRead);
+        Assert.Null(await limiter.TryAcquireAsync(
+            userId, null, null, BffProxyTrafficKind.Read, default));
+
+        await firstFile.DisposeAsync();
+        await using var afterRelease = await limiter.TryAcquireAsync(
+            userId, null, null, BffProxyTrafficKind.FileTransfer, default);
+        Assert.NotNull(afterRelease);
+        await secondFile.DisposeAsync();
     }
 
     [Theory]
@@ -234,7 +285,8 @@ public sealed class BffProxySecurityTests
     private static BffProxyTrafficLimiter CreateTrafficLimiter(
         TimeProvider timeProvider,
         int readRate,
-        int readConcurrency)
+        int readConcurrency,
+        int fileTransferConcurrency = 200)
     {
         return new BffProxyTrafficLimiter(
             Options.Create(new BffProxyOptions
@@ -242,7 +294,8 @@ public sealed class BffProxySecurityTests
                 ReadRequestsPerMinute = readRate,
                 MutationRequestsPerMinute = 10,
                 ReadConcurrentRequests = readConcurrency,
-                MutationConcurrentRequests = 1
+                MutationConcurrentRequests = 1,
+                FileTransferConcurrentRequests = fileTransferConcurrency
             }),
             timeProvider);
     }

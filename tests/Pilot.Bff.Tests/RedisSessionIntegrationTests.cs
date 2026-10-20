@@ -33,29 +33,46 @@ public sealed class RedisSessionIntegrationTests
                 certificate,
                 certificatePassword,
                 readRate: 1,
-                readConcurrency: 1);
+                readConcurrency: 1,
+                fileTransferConcurrency: 1);
             await using var replicaB = CreateReplica(
                 redisConnection,
                 instance,
                 certificate,
                 certificatePassword,
                 readRate: 1,
-                readConcurrency: 1);
+                readConcurrency: 1,
+                fileTransferConcurrency: 1);
             var limiterA = replicaA.GetRequiredService<IBffProxyTrafficLimiter>();
             var limiterB = replicaB.GetRequiredService<IBffProxyTrafficLimiter>();
             var firstUser = Guid.NewGuid();
             var secondUser = Guid.NewGuid();
 
-            var first = await limiterA.TryAcquireAsync(firstUser, null, null, false, default);
+            var first = await limiterA.TryAcquireAsync(
+                firstUser, null, null, BffProxyTrafficKind.Read, default);
             Assert.NotNull(first);
-            Assert.Null(await limiterB.TryAcquireAsync(secondUser, null, null, false, default));
+            Assert.Null(await limiterB.TryAcquireAsync(
+                secondUser, null, null, BffProxyTrafficKind.Read, default));
 
             await first.DisposeAsync();
-            var afterRelease = await limiterB.TryAcquireAsync(secondUser, null, null, false, default);
+            var afterRelease = await limiterB.TryAcquireAsync(
+                secondUser, null, null, BffProxyTrafficKind.Read, default);
             Assert.NotNull(afterRelease);
             await afterRelease.DisposeAsync();
 
-            Assert.Null(await limiterA.TryAcquireAsync(secondUser, null, null, false, default));
+            Assert.Null(await limiterA.TryAcquireAsync(
+                secondUser, null, null, BffProxyTrafficKind.Read, default));
+
+            var firstFile = await limiterA.TryAcquireAsync(
+                firstUser, null, null, BffProxyTrafficKind.FileTransfer, default);
+            Assert.NotNull(firstFile);
+            Assert.Null(await limiterB.TryAcquireAsync(
+                secondUser, null, null, BffProxyTrafficKind.FileTransfer, default));
+
+            await firstFile.DisposeAsync();
+            await using var fileAfterRelease = await limiterB.TryAcquireAsync(
+                secondUser, null, null, BffProxyTrafficKind.FileTransfer, default);
+            Assert.NotNull(fileAfterRelease);
         }
         finally
         {
@@ -191,7 +208,8 @@ public sealed class RedisSessionIntegrationTests
         string? previousCertificate = null,
         string? previousPassword = null,
         int readRate = 120,
-        int readConcurrency = 50)
+        int readConcurrency = 50,
+        int fileTransferConcurrency = 200)
     {
         var values = new Dictionary<string, string?>
         {
@@ -206,11 +224,10 @@ public sealed class RedisSessionIntegrationTests
             ["Bff:DataProtection:CertificatePassword"] = currentPassword,
             ["Bff:DataProtection:PreviousCertificateBase64"] = previousCertificate,
             ["Bff:DataProtection:PreviousCertificatePassword"] = previousPassword,
-            ["Identity:TimeoutSeconds"] = "10"
-            ,
-            ["Bff:Proxy:ReadRequestsPerMinute"] = readRate.ToString(System.Globalization.CultureInfo.InvariantCulture)
-            ,
-            ["Bff:Proxy:ReadConcurrentRequests"] = readConcurrency.ToString(System.Globalization.CultureInfo.InvariantCulture)
+            ["Identity:TimeoutSeconds"] = "10",
+            ["Bff:Proxy:ReadRequestsPerMinute"] = readRate.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            ["Bff:Proxy:ReadConcurrentRequests"] = readConcurrency.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            ["Bff:Proxy:FileTransferConcurrentRequests"] = fileTransferConcurrency.ToString(System.Globalization.CultureInfo.InvariantCulture)
         };
         var configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(values)

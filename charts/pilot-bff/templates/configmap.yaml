@@ -42,6 +42,7 @@ data:
   Bff__Proxy__MutationRequestsPerMinute: {{ .Values.env.proxyMutationRequestsPerMinute | quote }}
   Bff__Proxy__ReadConcurrentRequests: {{ .Values.env.proxyReadConcurrentRequests | quote }}
   Bff__Proxy__MutationConcurrentRequests: {{ .Values.env.proxyMutationConcurrentRequests | quote }}
+  Bff__Proxy__FileTransferConcurrentRequests: {{ .Values.env.proxyFileTransferConcurrentRequests | quote }}
   Redis__Enabled: {{ .Values.env.redisEnabled | quote }}
   Redis__InstanceName: {{ .Values.env.redisInstanceName | quote }}
   Redis__EnvironmentName: {{ .Values.env.redisEnvironmentName | quote }}

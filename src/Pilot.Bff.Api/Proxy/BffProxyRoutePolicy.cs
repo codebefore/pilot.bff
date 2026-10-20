@@ -3,7 +3,7 @@ namespace Pilot.Bff.Api.Proxy;
 public interface IBffProxyRoutePolicy
 {
     bool TryResolve(string method, string service, string? path, out string targetPath);
-    bool IsMutation(string method, string targetPath);
+    BffProxyTrafficKind ClassifyTraffic(string method, string targetPath);
 }
 
 public sealed class BffProxyRoutePolicy : IBffProxyRoutePolicy
@@ -91,11 +91,54 @@ public sealed class BffProxyRoutePolicy : IBffProxyRoutePolicy
         return true;
     }
 
-    public bool IsMutation(string method, string targetPath) =>
-        !HttpMethods.IsGet(method) &&
-        !HttpMethods.IsHead(method) &&
-        !(HttpMethods.IsPost(method) &&
-          ReadOnlyPostPaths.Contains(targetPath));
+    public BffProxyTrafficKind ClassifyTraffic(string method, string targetPath)
+    {
+        if (IsFileTransfer(method, targetPath))
+        {
+            return BffProxyTrafficKind.FileTransfer;
+        }
+
+        return !HttpMethods.IsGet(method) &&
+               !HttpMethods.IsHead(method) &&
+               !(HttpMethods.IsPost(method) && ReadOnlyPostPaths.Contains(targetPath))
+            ? BffProxyTrafficKind.Mutation
+            : BffProxyTrafficKind.Read;
+    }
+
+    private static bool IsFileTransfer(string method, string targetPath)
+    {
+        if (!HttpMethods.IsGet(method) && !HttpMethods.IsHead(method))
+        {
+            return false;
+        }
+
+        var segments = targetPath.Split('/', StringSplitOptions.RemoveEmptyEntries);
+        return segments switch
+        {
+            ["v1", "document", "candidates", var candidateId, "documents", var documentId, "download"]
+                when AreGuids(candidateId, documentId) => true,
+            ["v1", "document", "vehicles", var vehicleId, "documents", var documentId, "download"]
+                when AreGuids(vehicleId, documentId) => true,
+            ["v1", "document", "instructors", var instructorId, "assignments", var assignmentId,
+                "documents", var documentId, "file"]
+                when AreGuids(instructorId, assignmentId, documentId) => true,
+            ["v1", "document", "correspondence", var correspondenceId, "files", var fileId, "download"]
+                when AreGuids(correspondenceId, fileId) => true,
+            ["v1", "document", "correspondence", var correspondenceId, "packet-pdf"]
+                when AreGuids(correspondenceId) => true,
+            ["v1", "document", "legislation", "documents", var legislationId, "files", var fileId, "download"]
+                when AreGuids(legislationId, fileId) => true,
+            ["v1", "training", "instructors", var instructorId, "photo"]
+                when AreGuids(instructorId) => true,
+            ["v1", "platform", "institution-settings", "logo", "file"] => true,
+            ["v1", "platform", "institution-backups", var backupId, "download"]
+                when AreGuids(backupId) => true,
+            _ => false
+        };
+    }
+
+    private static bool AreGuids(params string[] values) =>
+        values.All(value => Guid.TryParse(value, out var parsed) && parsed != Guid.Empty);
 
     private static bool IsExplicitlyAllowedOperationalRead(
         string method,

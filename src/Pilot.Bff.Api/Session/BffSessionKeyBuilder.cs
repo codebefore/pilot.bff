@@ -21,6 +21,8 @@ public interface IBffSessionKeyBuilder
         bool mutation);
 
     string ProxyConcurrency(bool mutation);
+
+    string ProxyFileTransferConcurrency();
 }
 
 public sealed class BffSessionKeyBuilder(IOptions<BffRedisOptions> options) : IBffSessionKeyBuilder
@@ -54,6 +56,9 @@ public sealed class BffSessionKeyBuilder(IOptions<BffRedisOptions> options) : IB
 
     public string ProxyConcurrency(bool mutation) =>
         $"{Prefix()}:{{{TrafficHashSlot()}}}:proxy-concurrency:{(mutation ? "mutation" : "read")}";
+
+    public string ProxyFileTransferConcurrency() =>
+        $"{Prefix()}:{{{TrafficHashSlot()}}}:proxy-concurrency:file-transfer";
 
     private string SessionScopedKey(string sessionId, string purpose)
     {

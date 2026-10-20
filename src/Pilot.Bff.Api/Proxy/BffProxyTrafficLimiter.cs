@@ -12,8 +12,15 @@ public interface IBffProxyTrafficLimiter
         Guid userId,
         Guid? institutionId,
         IPAddress? clientIpAddress,
-        bool mutation,
+        BffProxyTrafficKind trafficKind,
         CancellationToken cancellationToken);
+}
+
+public enum BffProxyTrafficKind
+{
+    Read,
+    Mutation,
+    FileTransfer
 }
 
 public sealed class BffProxyTrafficLimiter : IBffProxyTrafficLimiter, IDisposable
@@ -24,6 +31,7 @@ public sealed class BffProxyTrafficLimiter : IBffProxyTrafficLimiter, IDisposabl
     private readonly TimeProvider timeProvider;
     private readonly SemaphoreSlim readConcurrency;
     private readonly SemaphoreSlim mutationConcurrency;
+    private readonly SemaphoreSlim fileTransferConcurrency;
     private readonly object rateLock = new();
     private readonly RateWindow readOverflowWindow = new();
     private readonly RateWindow mutationOverflowWindow = new();
@@ -37,22 +45,29 @@ public sealed class BffProxyTrafficLimiter : IBffProxyTrafficLimiter, IDisposabl
         this.timeProvider = timeProvider;
         readConcurrency = new SemaphoreSlim(this.options.ReadConcurrentRequests);
         mutationConcurrency = new SemaphoreSlim(this.options.MutationConcurrentRequests);
+        fileTransferConcurrency = new SemaphoreSlim(this.options.FileTransferConcurrentRequests);
     }
 
     public ValueTask<IAsyncDisposable?> TryAcquireAsync(
         Guid userId,
         Guid? institutionId,
         IPAddress? clientIpAddress,
-        bool mutation,
+        BffProxyTrafficKind trafficKind,
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        if (!ConsumeRatePermit(userId, institutionId, clientIpAddress, mutation))
+        if (trafficKind != BffProxyTrafficKind.FileTransfer &&
+            !ConsumeRatePermit(userId, institutionId, clientIpAddress, trafficKind))
         {
             return ValueTask.FromResult<IAsyncDisposable?>(null);
         }
 
-        var concurrency = mutation ? mutationConcurrency : readConcurrency;
+        var concurrency = trafficKind switch
+        {
+            BffProxyTrafficKind.Mutation => mutationConcurrency,
+            BffProxyTrafficKind.FileTransfer => fileTransferConcurrency,
+            _ => readConcurrency
+        };
         return ValueTask.FromResult<IAsyncDisposable?>(concurrency.Wait(0)
             ? new ConcurrencyLease(concurrency)
             : null);
@@ -62,6 +77,7 @@ public sealed class BffProxyTrafficLimiter : IBffProxyTrafficLimiter, IDisposabl
     {
         readConcurrency.Dispose();
         mutationConcurrency.Dispose();
+        fileTransferConcurrency.Dispose();
         cache.Dispose();
     }
 
@@ -69,8 +85,9 @@ public sealed class BffProxyTrafficLimiter : IBffProxyTrafficLimiter, IDisposabl
         Guid userId,
         Guid? institutionId,
         IPAddress? clientIpAddress,
-        bool mutation)
+        BffProxyTrafficKind trafficKind)
     {
+        var mutation = trafficKind == BffProxyTrafficKind.Mutation;
         var clientPartition = clientIpAddress is null
             ? "unknown"
             : Convert.ToHexString(SHA256.HashData(clientIpAddress.GetAddressBytes()));

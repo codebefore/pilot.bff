@@ -84,12 +84,12 @@ public static class BffProxyEndpoints
         }
 
         cookie.Append(context.Response, authorization.SessionId!, authorization.Value.IdleExpiresAtUtc);
-        var mutation = routePolicy.IsMutation(context.Request.Method, targetPath);
+        var trafficKind = routePolicy.ClassifyTraffic(context.Request.Method, targetPath);
         await using var trafficLease = await trafficLimiter.TryAcquireAsync(
             authorization.Value.UserId,
             authorization.Value.InstitutionId,
             context.Connection.RemoteIpAddress,
-            mutation,
+            trafficKind,
             cancellationToken);
         if (trafficLease is null)
         {

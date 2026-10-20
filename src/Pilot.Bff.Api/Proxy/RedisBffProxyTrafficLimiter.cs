@@ -34,17 +34,48 @@ public sealed class RedisBffProxyTrafficLimiter(
         redis.call('PEXPIRE', KEYS[2], lease_ms)
         return 1
         """;
+    private const string AcquireConcurrencyScript = """
+        local clock = redis.call('TIME')
+        local now = (clock[1] * 1000) + math.floor(clock[2] / 1000)
+        local lease_ms = tonumber(ARGV[3])
+
+        redis.call('ZREMRANGEBYSCORE', KEYS[1], '-inf', now)
+        if redis.call('ZCARD', KEYS[1]) >= tonumber(ARGV[2]) then
+            return 0
+        end
+
+        redis.call('ZADD', KEYS[1], now + lease_ms, ARGV[1])
+        redis.call('PEXPIRE', KEYS[1], lease_ms)
+        return 1
+        """;
 
     public async ValueTask<IAsyncDisposable?> TryAcquireAsync(
         Guid userId,
         Guid? institutionId,
         IPAddress? clientIpAddress,
-        bool mutation,
+        BffProxyTrafficKind trafficKind,
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         var value = options.Value;
         var requestId = Guid.NewGuid().ToString("N");
+        if (trafficKind == BffProxyTrafficKind.FileTransfer)
+        {
+            var fileTransferLeaseMilliseconds = checked(
+                (value.ResponseStreamingTimeoutSeconds + 10) * 1000);
+            var fileTransferKey = keyBuilder.ProxyFileTransferConcurrency();
+            var fileTransferResult = await redis.GetDatabase().ScriptEvaluateAsync(
+                AcquireConcurrencyScript,
+                [fileTransferKey],
+                [requestId, value.FileTransferConcurrentRequests, fileTransferLeaseMilliseconds])
+                .WaitAsync(cancellationToken);
+            return (long)fileTransferResult == 1
+                ? new RedisConcurrencyLease(redis.GetDatabase(), fileTransferKey, requestId)
+                : null;
+        }
+
+        var mutation = trafficKind == BffProxyTrafficKind.Mutation;
+        var leaseMilliseconds = checked((value.TimeoutSeconds + 10) * 1000);
         var concurrencyKey = keyBuilder.ProxyConcurrency(mutation);
         var result = await redis.GetDatabase().ScriptEvaluateAsync(
             AcquireScript,
@@ -54,7 +85,7 @@ public sealed class RedisBffProxyTrafficLimiter(
                 mutation ? value.MutationRequestsPerMinute : value.ReadRequestsPerMinute,
                 mutation ? value.MutationConcurrentRequests : value.ReadConcurrentRequests,
                 WindowMilliseconds,
-                checked((value.TimeoutSeconds + 10) * 1000)
+                leaseMilliseconds
             ]).WaitAsync(cancellationToken);
 
         return (long)result == 1

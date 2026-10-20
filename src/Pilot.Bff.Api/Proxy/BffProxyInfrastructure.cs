@@ -69,7 +69,8 @@ public static class BffProxyInfrastructure
             options.ReadRequestsPerMinute is < 1 or > 10_000 ||
             options.MutationRequestsPerMinute is < 1 or > 10_000 ||
             options.ReadConcurrentRequests is < 1 or > 1_000 ||
-            options.MutationConcurrentRequests is < 1 or > 1_000)
+            options.MutationConcurrentRequests is < 1 or > 1_000 ||
+            options.FileTransferConcurrentRequests is < 1 or > 1_000)
         {
             throw new InvalidOperationException("BFF proxy limits are outside the allowed range.");
         }
