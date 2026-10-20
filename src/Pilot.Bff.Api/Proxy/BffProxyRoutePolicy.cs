@@ -8,8 +8,12 @@ public interface IBffProxyRoutePolicy
 
 public sealed class BffProxyRoutePolicy : IBffProxyRoutePolicy
 {
-    private const string PracticeLessonSummaryQueryPath =
-        "/v1/training/practice-candidates/lesson-summaries/query";
+    private static readonly HashSet<string> ReadOnlyPostPaths =
+        new(StringComparer.Ordinal)
+        {
+            "/v1/document/documents/candidate-photos",
+            "/v1/training/practice-candidates/lesson-summaries/query"
+        };
 
     private static readonly HashSet<string> AllowedMethods =
         new(StringComparer.OrdinalIgnoreCase) { "GET", "HEAD", "POST", "PUT", "PATCH", "DELETE" };
@@ -91,7 +95,7 @@ public sealed class BffProxyRoutePolicy : IBffProxyRoutePolicy
         !HttpMethods.IsGet(method) &&
         !HttpMethods.IsHead(method) &&
         !(HttpMethods.IsPost(method) &&
-          string.Equals(targetPath, PracticeLessonSummaryQueryPath, StringComparison.Ordinal));
+          ReadOnlyPostPaths.Contains(targetPath));
 
     private static bool IsExplicitlyAllowedOperationalRead(
         string method,

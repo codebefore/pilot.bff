@@ -65,10 +65,13 @@ public sealed class BffProxySecurityTests
     [InlineData("GET", "/v1/training/practice-candidates", false)]
     [InlineData("HEAD", "/v1/training/practice-candidates", false)]
     [InlineData("POST", "/v1/training/practice-candidates/lesson-summaries/query", false)]
+    [InlineData("POST", "/v1/document/documents/candidate-photos", false)]
     [InlineData("POST", "/v1/training/practice-candidates/lesson-summaries", true)]
     [InlineData("POST", "/v1/training/practice-candidates/lesson-summaries/query/other", true)]
+    [InlineData("POST", "/v1/document/documents/candidate-photos/other", true)]
     [InlineData("PUT", "/v1/training/practice-candidates/lesson-summaries/query", true)]
-    public void RoutePolicy_ClassifiesOnlyTheExactLessonSummaryQueryAsRead(
+    [InlineData("PUT", "/v1/document/documents/candidate-photos", true)]
+    public void RoutePolicy_ClassifiesOnlyExactReadOnlyPostPathsAsRead(
         string method,
         string targetPath,
         bool expectedMutation)
