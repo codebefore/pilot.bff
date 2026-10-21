@@ -2,6 +2,7 @@ using System.Net.WebSockets;
 using Microsoft.Extensions.Options;
 using Pilot.Bff.Api.Auth;
 using Pilot.Bff.Api.Options;
+using Pilot.Observability;
 
 namespace Pilot.Bff.Api.Proxy;
 
@@ -32,6 +33,17 @@ public sealed class BffWebSocketProxy(IOptions<BffProxyOptions> options) : IBffW
         if (authorization.InstitutionId is { } institutionId)
         {
             upstream.Options.SetRequestHeader("X-Institution-Id", institutionId.ToString("D"));
+        }
+        if (InstitutionContextSignature.Create(
+                authorization.InstitutionId,
+                options.Value.InstitutionContextSigningKey) is { } institutionContext)
+        {
+            upstream.Options.SetRequestHeader(
+                InstitutionContextSignature.TimestampHeader,
+                institutionContext.Timestamp);
+            upstream.Options.SetRequestHeader(
+                InstitutionContextSignature.SignatureHeader,
+                institutionContext.Signature);
         }
 
         foreach (var protocol in context.WebSockets.WebSocketRequestedProtocols)

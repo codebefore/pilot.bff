@@ -11,6 +11,7 @@ using Pilot.Observability;
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddProblemDetails();
+builder.Services.AddHttpContextAccessor();
 builder.Services.AddSingleton<DependencyTelemetry>();
 builder.Services
     .AddHealthChecks()

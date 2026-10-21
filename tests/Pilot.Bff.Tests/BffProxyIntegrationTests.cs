@@ -14,6 +14,7 @@ namespace Pilot.Bff.Tests;
 
 public sealed class BffProxyIntegrationTests : IClassFixture<WebApplicationFactory<Program>>
 {
+    private const string InstitutionContextSigningKey = "test-institution-context-signing-key-1234567890";
     private readonly WebApplicationFactory<Program> factory;
 
     public BffProxyIntegrationTests(WebApplicationFactory<Program> factory)
@@ -29,6 +30,7 @@ public sealed class BffProxyIntegrationTests : IClassFixture<WebApplicationFacto
         using var configuredFactory = factory.WithWebHostBuilder(builder =>
         {
             builder.UseSetting("Bff:Proxy:Enabled", "true");
+            builder.UseSetting("Bff:Proxy:InstitutionContextSigningKey", InstitutionContextSigningKey);
             builder.ConfigureServices(services =>
             {
                 services.RemoveAll<IBffSessionStore>();
@@ -65,6 +67,8 @@ public sealed class BffProxyIntegrationTests : IClassFixture<WebApplicationFacto
         Assert.Equal(
             session.ActiveInstitution?.Id.ToString("D"),
             gateway.Request.Headers.GetValues("X-Institution-Id").Single());
+        Assert.True(gateway.Request.Headers.Contains("X-Pilot-Institution-Context-Timestamp"));
+        Assert.True(gateway.Request.Headers.Contains("X-Pilot-Institution-Context-Signature"));
         Assert.False(gateway.Request.Headers.Contains("Cookie"));
         Assert.False(gateway.Request.Headers.Contains("X-Forwarded-For"));
         Assert.Null(response.Headers.Location);
@@ -113,6 +117,8 @@ public sealed class BffProxyIntegrationTests : IClassFixture<WebApplicationFacto
             "Cookie",
             "__Host-pilot_session=session-id; secret=private-cookie-value");
         request.Headers.Authorization = new("Bearer", "private-browser-token");
+        const string browserInstitutionId = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee";
+        request.Headers.TryAddWithoutValidation("X-Institution-Id", browserInstitutionId);
 
         using var response = await client.SendAsync(request);
 
@@ -123,12 +129,55 @@ public sealed class BffProxyIntegrationTests : IClassFixture<WebApplicationFacto
         await logProvider.WaitForPerformanceLogAsync();
         var logs = string.Join('\n', logProvider.Messages);
         Assert.Contains("/bff/v1/{service}/{**path}", logs, StringComparison.Ordinal);
+        Assert.Contains(session.ActiveInstitution!.Id.ToString("D"), logs, StringComparison.Ordinal);
+        Assert.DoesNotContain(browserInstitutionId, logs, StringComparison.Ordinal);
         Assert.DoesNotContain("private-candidate-id", logs, StringComparison.Ordinal);
         Assert.DoesNotContain("private-query-value", logs, StringComparison.Ordinal);
         Assert.DoesNotContain("private-cookie-value", logs, StringComparison.Ordinal);
         Assert.DoesNotContain("private-browser-token", logs, StringComparison.Ordinal);
         Assert.DoesNotContain("server-access-token", logs, StringComparison.Ordinal);
         Assert.DoesNotContain("server-refresh-token", logs, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task SessionObservability_UsesActiveServerSideInstitution()
+    {
+        var logProvider = new CaptureLogProvider();
+        var session = CreateSession();
+        using var configuredFactory = factory.WithWebHostBuilder(builder =>
+        {
+            builder.UseSetting("Bff:Proxy:Enabled", "true");
+            builder.UseSetting("Performance:SlowRequestMs", "0");
+            builder.ConfigureLogging(logging =>
+            {
+                logging.ClearProviders();
+                logging.AddProvider(logProvider);
+            });
+            builder.ConfigureServices(services =>
+            {
+                services.RemoveAll<IBffSessionStore>();
+                services.AddSingleton<IBffSessionStore>(new FixedSessionStore("session-id", session));
+                services.AddSingleton<IOptions<BffSessionOptions>>(Options.Create(new BffSessionOptions
+                {
+                    Enabled = true,
+                    IdleTimeoutMinutes = 30,
+                    AbsoluteTimeoutHours = 12
+                }));
+            });
+        });
+        using var client = configuredFactory.CreateClient();
+        using var request = new HttpRequestMessage(HttpMethod.Get, "/bff/session");
+        request.Headers.TryAddWithoutValidation("Cookie", "__Host-pilot_session=session-id");
+
+        using var response = await client.SendAsync(request);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        await response.Content.ReadAsStringAsync();
+        await logProvider.WaitForPerformanceLogAsync();
+        Assert.Contains(
+            session.ActiveInstitution!.Id.ToString("D"),
+            string.Join('\n', logProvider.Messages),
+            StringComparison.Ordinal);
     }
 
     [Fact]

@@ -3,10 +3,15 @@ using Microsoft.Extensions.Options;
 using Pilot.Bff.Api.Contracts;
 using Pilot.Bff.Api.Options;
 using Pilot.Bff.Api.Session;
+using Pilot.Observability;
 
 namespace Pilot.Bff.Api.Auth;
 
-public sealed record BffAuthResult<T>(HttpStatusCode StatusCode, T? Value, string? SessionId = null);
+public sealed record BffAuthResult<T>(
+    HttpStatusCode StatusCode,
+    T? Value,
+    string? SessionId = null,
+    Guid? InstitutionId = null);
 
 public sealed record BffProxyAuthorization(
     Guid UserId,
@@ -21,7 +26,8 @@ public sealed class BffAuthService(
     IBffSessionLock sessionLock,
     IBffSessionIdGenerator sessionIds,
     IOptions<BffSessionOptions> options,
-    TimeProvider timeProvider)
+    TimeProvider timeProvider,
+    IHttpContextAccessor httpContextAccessor)
 {
     public Task<IdentityAuthResult<LoginOtpChallengeResponse>> RequestLoginCodeAsync(
         LoginOtpRequest request,
@@ -41,6 +47,7 @@ public sealed class BffAuthService(
         }
 
         var session = CreateSession(result.Value);
+        CaptureInstitution(session);
         var sessionId = sessionIds.Create();
         try
         {
@@ -77,6 +84,7 @@ public sealed class BffAuthService(
         {
             return new(HttpStatusCode.Unauthorized, null);
         }
+        CaptureInstitution(session);
 
         if (!RequiresMaintenance(session))
         {
@@ -118,6 +126,7 @@ public sealed class BffAuthService(
         }
 
         var current = maintained.Session;
+        CaptureInstitution(current);
 
         var identityResult = await identity.SelectInstitutionAsync(
             institutionId,
@@ -158,6 +167,7 @@ public sealed class BffAuthService(
         {
             return new(HttpStatusCode.Unauthorized, null);
         }
+        CaptureInstitution(current);
 
         if (RequiresMaintenance(current))
         {
@@ -200,7 +210,11 @@ public sealed class BffAuthService(
         var result = await identity.RequestMigrationAccessCodeAsync(
             authorization.Value.AccessToken,
             cancellationToken);
-        return new(result.StatusCode, result.Value, authorization.SessionId);
+        return new(
+            result.StatusCode,
+            result.Value,
+            authorization.SessionId,
+            authorization.Value.InstitutionId);
     }
 
     public async Task<BffAuthResult<BffMigrationAccessResponse>> VerifyMigrationAccessCodeAsync(
@@ -225,6 +239,7 @@ public sealed class BffAuthService(
         {
             return new(maintained.StatusCode, null);
         }
+        CaptureInstitution(current);
 
         var result = await identity.VerifyMigrationAccessCodeAsync(
             request,
@@ -255,24 +270,26 @@ public sealed class BffAuthService(
         return new(
             HttpStatusCode.OK,
             new BffMigrationAccessResponse(result.Value.ExpiresAtUtc),
-            sessionId);
+            sessionId,
+            current.ActiveInstitution.Id);
     }
 
-    public async Task LogoutAsync(string? sessionId, CancellationToken cancellationToken)
+    public async Task<Guid?> LogoutAsync(string? sessionId, CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(sessionId))
         {
-            return;
+            return null;
         }
 
         await using var lease = await AcquireLockAsync(sessionId, cancellationToken);
         if (lease is null)
         {
             await sessions.DeleteAsync(sessionId, CancellationToken.None);
-            return;
+            return null;
         }
 
         var session = await sessions.GetAsync(sessionId, cancellationToken);
+        CaptureInstitution(session);
         try
         {
             if (session is not null)
@@ -284,6 +301,8 @@ public sealed class BffAuthService(
         {
             await sessions.DeleteAsync(sessionId, CancellationToken.None);
         }
+
+        return session?.ActiveInstitution?.Id;
     }
 
     public Task InvalidateLocalSessionAsync(
@@ -304,6 +323,7 @@ public sealed class BffAuthService(
         {
             return (HttpStatusCode.Unauthorized, null);
         }
+        CaptureInstitution(current);
 
         var now = timeProvider.GetUtcNow().UtcDateTime;
         if (NeedsAccessTokenRefresh(current, now))
@@ -380,6 +400,14 @@ public sealed class BffAuthService(
             session.MigrationAccessInstitutionId == session.ActiveInstitution?.Id
                 ? session.MigrationAccessToken
                 : null;
+    }
+
+    private void CaptureInstitution(BffSessionRecord? session)
+    {
+        if (httpContextAccessor.HttpContext is { } context)
+        {
+            InstitutionTelemetryContext.Set(context, session?.ActiveInstitution?.Id);
+        }
     }
 
     private Task<IAsyncDisposable?> AcquireLockAsync(

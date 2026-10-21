@@ -75,6 +75,7 @@ sessionSecrets:
   redisKeyPepperKey: Redis__KeyPepper
   dataProtectionCertificateBase64Key: Bff__DataProtection__CertificateBase64
   dataProtectionCertificatePasswordKey: Bff__DataProtection__CertificatePassword
+  institutionContextSigningKeyKey: InstitutionTelemetry__SigningKey
   releaseGrantSigningKeyKey: ReleaseGrant__SigningKey
   dataProtectionPreviousCertificateBase64Key: ""
   dataProtectionPreviousCertificatePasswordKey: ""

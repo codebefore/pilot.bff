@@ -5,6 +5,76 @@ using Microsoft.AspNetCore.Routing;
 
 namespace Pilot.Observability;
 
+public static class InstitutionTelemetryContext
+{
+    private const string ItemKey = "Pilot.Observability.InstitutionId";
+    private const string LoggingScopeItemKey = "Pilot.Observability.LoggingScope";
+    private const string ActivityTagKey = "pilot.institution_id";
+
+    public static void Capture(HttpContext context)
+    {
+        var institutionId = Get(context);
+        if (institutionId is not null)
+        {
+            Set(context, Guid.Parse(institutionId));
+        }
+    }
+
+    public static void Set(HttpContext context, Guid? institutionId)
+    {
+        if (institutionId is not { } value || value == Guid.Empty)
+        {
+            return;
+        }
+
+        var normalized = value.ToString("D");
+        context.Items[ItemKey] = normalized;
+        Activity.Current?.SetTag(ActivityTagKey, normalized);
+        if (context.Items.TryGetValue(LoggingScopeItemKey, out var scope) &&
+            scope is IDictionary<string, object> loggingScope)
+        {
+            loggingScope["institution_id"] = normalized;
+        }
+    }
+
+    public static string? Get(HttpContext context)
+    {
+        if (context.Items.TryGetValue(ItemKey, out var stored) && Normalize(stored?.ToString()) is { } itemValue)
+        {
+            return itemValue;
+        }
+
+        return Get(Activity.Current);
+    }
+
+    public static void AttachLoggingScope(HttpContext context, IDictionary<string, object> loggingScope)
+    {
+        context.Items[LoggingScopeItemKey] = loggingScope;
+        if (Get(context) is { } institutionId)
+        {
+            loggingScope["institution_id"] = institutionId;
+        }
+    }
+
+    public static string? Get(Activity? activity)
+    {
+        for (var current = activity; current is not null; current = current.Parent)
+        {
+            if (Normalize(current.GetTagItem(ActivityTagKey)?.ToString()) is { } value)
+            {
+                return value;
+            }
+        }
+
+        return null;
+    }
+
+    private static string? Normalize(string? value) =>
+        Guid.TryParse(value, out var institutionId) && institutionId != Guid.Empty
+            ? institutionId.ToString("D")
+            : null;
+}
+
 public sealed class RequestPerformanceMiddleware(
     RequestDelegate next,
     ILogger<RequestPerformanceMiddleware> logger,
@@ -22,6 +92,7 @@ public sealed class RequestPerformanceMiddleware(
     {
         var started = Stopwatch.GetTimestamp();
         using var fallback = Activity.Current is null ? StartFallbackActivity(context) : null;
+        InstitutionTelemetryContext.Capture(context);
         var traceId = Activity.Current!.TraceId.ToString();
         var spanId = Activity.Current.SpanId.ToString();
         double? headersMs = null;
@@ -31,11 +102,13 @@ public sealed class RequestPerformanceMiddleware(
         string Route() =>
             (context.GetEndpoint() as RouteEndpoint)?.RoutePattern.RawText ?? "unmatched";
         var health = context.Request.Path.StartsWithSegments("/health");
-        using var scope = logger.BeginScope(new Dictionary<string, object>
+        var loggingScope = new DynamicLoggingScope
         {
             ["TraceId"] = traceId,
             ["SpanId"] = spanId
-        });
+        };
+        using var scope = logger.BeginScope(loggingScope);
+        InstitutionTelemetryContext.AttachLoggingScope(context, loggingScope);
 
         void Emit(string outcome, int status, string? errorType = null)
         {
@@ -46,6 +119,8 @@ public sealed class RequestPerformanceMiddleware(
 
             var elapsed = Stopwatch.GetElapsedTime(started).TotalMilliseconds;
             var route = Route();
+            InstitutionTelemetryContext.Capture(context);
+            var institutionId = InstitutionTelemetryContext.Get(context);
             Duration.Record(elapsed / 1000, new TagList
             {
                 { "service", service },
@@ -62,6 +137,7 @@ public sealed class RequestPerformanceMiddleware(
             var payload = JsonSerializer.Serialize(new
             {
                 service,
+                institution_id = institutionId,
                 trace_id = traceId,
                 span_id = spanId,
                 method,
@@ -134,4 +210,10 @@ public sealed class RequestPerformanceMiddleware(
 
         return activity.Start();
     }
+}
+
+file sealed class DynamicLoggingScope : Dictionary<string, object>
+{
+    public override string ToString() =>
+        string.Join(", ", this.Select(entry => $"{entry.Key}:{entry.Value}"));
 }

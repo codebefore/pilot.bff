@@ -1,5 +1,6 @@
 using System.Net;
 using System.Collections.Concurrent;
+using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Options;
 using Pilot.Bff.Api.Auth;
 using Pilot.Bff.Api.Contracts;
@@ -277,7 +278,8 @@ public sealed class BffAuthServiceTests
                 IdleTimeoutMinutes = 30,
                 AbsoluteTimeoutHours = 12
             }),
-            TimeProvider.System);
+            TimeProvider.System,
+            new HttpContextAccessor { HttpContext = new DefaultHttpContext() });
     }
 
     private static IdentityLoginResponse CreateLoginResponse(

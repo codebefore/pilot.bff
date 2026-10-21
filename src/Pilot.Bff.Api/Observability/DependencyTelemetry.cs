@@ -85,6 +85,7 @@ public sealed class DependencyTelemetry : IDisposable
             duration_ms = Math.Round(milliseconds, 3),
             outcome,
             error_type = errorType,
+            institution_id = InstitutionTelemetryContext.Get(activity),
             trace_id = activity?.TraceId.ToString(),
             span_id = activity?.SpanId.ToString(),
             parent_span_id = activity?.ParentSpanId.ToString(),

@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Antiforgery;
 using Pilot.Bff.Api.Auth;
 using Pilot.Bff.Api.Contracts;
 using Pilot.Bff.Api.Security;
+using Pilot.Observability;
 using StackExchange.Redis;
 
 namespace Pilot.Bff.Api.Endpoints;
@@ -75,6 +76,7 @@ public static class BffAuthEndpoints
             var result = await auth.RequestMigrationAccessCodeAsync(
                 cookie.Read(context.Request),
                 cancellationToken);
+            InstitutionTelemetryContext.Set(context, result.InstitutionId);
             if (result.StatusCode == HttpStatusCode.Unauthorized)
             {
                 cookie.Delete(context.Response);
@@ -103,6 +105,7 @@ public static class BffAuthEndpoints
                 cookie.Read(context.Request),
                 request,
                 cancellationToken);
+            InstitutionTelemetryContext.Set(context, result.InstitutionId);
             return result.StatusCode == HttpStatusCode.OK && result.Value is not null
                 ? Results.Ok(result.Value)
                 : Status(result.StatusCode);
@@ -151,6 +154,7 @@ public static class BffAuthEndpoints
                 result.Value is not null &&
                 result.SessionId is not null)
             {
+                InstitutionTelemetryContext.Set(context, result.Value.ActiveInstitution?.Id);
                 cookie.Append(context.Response, result.SessionId, result.Value.IdleExpiresAtUtc);
                 return Results.Ok(result.Value);
             }
@@ -174,6 +178,7 @@ public static class BffAuthEndpoints
             var result = await auth.GetSessionAsync(cookie.Read(context.Request), cancellationToken);
             if (result.StatusCode == HttpStatusCode.OK && result.Value is not null)
             {
+                InstitutionTelemetryContext.Set(context, result.Value.ActiveInstitution?.Id);
                 cookie.Append(context.Response, result.SessionId!, result.Value.IdleExpiresAtUtc);
                 return Results.Ok(result.Value);
             }
@@ -208,6 +213,7 @@ public static class BffAuthEndpoints
                 result.Value is not null &&
                 result.SessionId is not null)
             {
+                InstitutionTelemetryContext.Set(context, result.Value.ActiveInstitution?.Id);
                 cookie.Append(context.Response, result.SessionId, result.Value.IdleExpiresAtUtc);
                 return Results.Ok(result.Value);
             }
@@ -233,7 +239,8 @@ public static class BffAuthEndpoints
     {
         try
         {
-            await auth.LogoutAsync(cookie.Read(context.Request), cancellationToken);
+            var institutionId = await auth.LogoutAsync(cookie.Read(context.Request), cancellationToken);
+            InstitutionTelemetryContext.Set(context, institutionId);
             return Results.NoContent();
         }
         catch (Exception exception) when (IsDependencyFailure(exception, cancellationToken))

@@ -5,6 +5,7 @@ using Pilot.Bff.Api.Auth;
 using Pilot.Bff.Api.Options;
 using Pilot.Bff.Api.Proxy;
 using Pilot.Bff.Api.Security;
+using Pilot.Observability;
 
 namespace Pilot.Bff.Api.Endpoints;
 
@@ -83,6 +84,7 @@ public static class BffProxyEndpoints
             return Results.StatusCode((int)authorization.StatusCode);
         }
 
+        InstitutionTelemetryContext.Set(context, authorization.Value.InstitutionId);
         cookie.Append(context.Response, authorization.SessionId!, authorization.Value.IdleExpiresAtUtc);
         var trafficKind = routePolicy.ClassifyTraffic(context.Request.Method, targetPath);
         await using var trafficLease = await trafficLimiter.TryAcquireAsync(
@@ -111,6 +113,17 @@ public static class BffProxyEndpoints
         }
 
         using var upstreamRequest = requestFactory.Create(context.Request, targetPath, authorization.Value);
+        if (InstitutionContextSignature.Create(
+                authorization.Value.InstitutionId,
+                proxyOptions.Value.InstitutionContextSigningKey) is { } institutionContext)
+        {
+            upstreamRequest.Headers.TryAddWithoutValidation(
+                InstitutionContextSignature.TimestampHeader,
+                institutionContext.Timestamp);
+            upstreamRequest.Headers.TryAddWithoutValidation(
+                InstitutionContextSignature.SignatureHeader,
+                institutionContext.Signature);
+        }
         HttpResponseMessage upstreamResponse;
         try
         {

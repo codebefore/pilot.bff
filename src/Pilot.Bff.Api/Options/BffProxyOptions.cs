@@ -27,4 +27,6 @@ public sealed class BffProxyOptions
     public int MutationConcurrentRequests { get; init; } = 10;
 
     public int FileTransferConcurrentRequests { get; init; } = 200;
+
+    public string InstitutionContextSigningKey { get; init; } = string.Empty;
 }
