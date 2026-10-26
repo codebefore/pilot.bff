@@ -13,7 +13,8 @@ public sealed class BffProxyRequestFactory : IBffProxyRequestFactory
 {
     private static readonly string[] ForwardedRequestHeaders =
         [HeaderNames.Accept, HeaderNames.AcceptLanguage, HeaderNames.IfMatch,
-         HeaderNames.IfNoneMatch, HeaderNames.IfModifiedSince, HeaderNames.Range];
+         HeaderNames.IfNoneMatch, HeaderNames.IfModifiedSince, HeaderNames.Range,
+         "X-Pilot-Target-Client-Id", "X-Pilot-Transfer-Owner"];
 
     public HttpRequestMessage Create(
         HttpRequest incoming,

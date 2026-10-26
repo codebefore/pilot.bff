@@ -104,6 +104,10 @@ public sealed class BffProxySecurityTests
         context.Request.Headers.Host = "evil.example";
         context.Request.Headers["X-Institution-Id"] = Guid.NewGuid().ToString("D");
         context.Request.Headers["X-Forwarded-For"] = "203.0.113.10";
+        var targetClientId = Guid.NewGuid();
+        var transferOwner = Guid.NewGuid();
+        context.Request.Headers["X-Pilot-Target-Client-Id"] = targetClientId.ToString("D");
+        context.Request.Headers["X-Pilot-Transfer-Owner"] = transferOwner.ToString("D");
         context.Request.Headers.Accept = "application/json";
         var institutionId = Guid.NewGuid();
         var authorization = new BffProxyAuthorization(
@@ -121,6 +125,8 @@ public sealed class BffProxySecurityTests
         Assert.Equal("Bearer", request.Headers.Authorization?.Scheme);
         Assert.Equal("server-access-token", request.Headers.Authorization?.Parameter);
         Assert.Equal(institutionId.ToString("D"), request.Headers.GetValues("X-Institution-Id").Single());
+        Assert.Equal(targetClientId.ToString("D"), request.Headers.GetValues("X-Pilot-Target-Client-Id").Single());
+        Assert.Equal(transferOwner.ToString("D"), request.Headers.GetValues("X-Pilot-Transfer-Owner").Single());
         Assert.Equal("application/json", request.Headers.Accept.Single().MediaType);
         Assert.False(request.Headers.Contains("Cookie"));
         Assert.False(request.Headers.Contains("Host"));
