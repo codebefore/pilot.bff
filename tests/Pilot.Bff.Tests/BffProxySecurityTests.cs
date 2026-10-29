@@ -108,6 +108,7 @@ public sealed class BffProxySecurityTests
         var transferOwner = Guid.NewGuid();
         context.Request.Headers["X-Pilot-Target-Client-Id"] = targetClientId.ToString("D");
         context.Request.Headers["X-Pilot-Transfer-Owner"] = transferOwner.ToString("D");
+        context.Request.Headers["X-Course-Type"] = "SRC";
         context.Request.Headers.Accept = "application/json";
         var institutionId = Guid.NewGuid();
         var authorization = new BffProxyAuthorization(
@@ -127,6 +128,7 @@ public sealed class BffProxySecurityTests
         Assert.Equal(institutionId.ToString("D"), request.Headers.GetValues("X-Institution-Id").Single());
         Assert.Equal(targetClientId.ToString("D"), request.Headers.GetValues("X-Pilot-Target-Client-Id").Single());
         Assert.Equal(transferOwner.ToString("D"), request.Headers.GetValues("X-Pilot-Transfer-Owner").Single());
+        Assert.Equal("SRC", request.Headers.GetValues("X-Course-Type").Single());
         Assert.Equal("application/json", request.Headers.Accept.Single().MediaType);
         Assert.False(request.Headers.Contains("Cookie"));
         Assert.False(request.Headers.Contains("Host"));

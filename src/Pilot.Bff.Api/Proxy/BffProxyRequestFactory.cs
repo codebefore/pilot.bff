@@ -14,7 +14,7 @@ public sealed class BffProxyRequestFactory : IBffProxyRequestFactory
     private static readonly string[] ForwardedRequestHeaders =
         [HeaderNames.Accept, HeaderNames.AcceptLanguage, HeaderNames.IfMatch,
          HeaderNames.IfNoneMatch, HeaderNames.IfModifiedSince, HeaderNames.Range,
-         "X-Pilot-Target-Client-Id", "X-Pilot-Transfer-Owner"];
+         "X-Pilot-Target-Client-Id", "X-Pilot-Transfer-Owner", "X-Course-Type"];
 
     public HttpRequestMessage Create(
         HttpRequest incoming,
