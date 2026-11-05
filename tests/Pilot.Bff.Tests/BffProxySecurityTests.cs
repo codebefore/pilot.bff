@@ -14,6 +14,8 @@ public sealed class BffProxySecurityTests
     [InlineData("GET", "identity", "users/123", "/v1/identity/users/123")]
     [InlineData("DELETE", "identity", "auth/sessions/123", "/v1/identity/auth/sessions/123")]
     [InlineData("GET", "platform", "notifications", "/v1/platform/notifications")]
+    [InlineData("GET", "platform", "contracts/me/pending", "/v1/platform/contracts/me/pending")]
+    [InlineData("POST", "platform", "contracts/me/accept", "/v1/platform/contracts/me/accept")]
     [InlineData("GET", "platform", "maintenance", "/v1/platform/maintenance")]
     [InlineData("HEAD", "platform", "maintenance", "/v1/platform/maintenance")]
     [InlineData("GET", "platform", "outbox/health", "/v1/platform/outbox/health")]

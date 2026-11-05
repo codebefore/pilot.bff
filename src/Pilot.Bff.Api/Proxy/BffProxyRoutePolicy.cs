@@ -29,7 +29,7 @@ public sealed class BffProxyRoutePolicy : IBffProxyRoutePolicy
         {
             "institution-settings", "stats", "notifications", "outbox", "inbox",
             "system-health", "institution-backups", "institutions", "browser-performance",
-            "releases", "grafana", "local-agent"
+            "releases", "grafana", "local-agent", "contracts"
         };
 
     private static readonly HashSet<string> IdentityRoots =
