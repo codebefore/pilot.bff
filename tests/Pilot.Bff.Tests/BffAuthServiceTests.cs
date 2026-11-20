@@ -9,7 +9,7 @@ using Pilot.Bff.Api.Session;
 
 namespace Pilot.Bff.Tests;
 
-public sealed class BffAuthServiceTests
+public sealed partial class BffAuthServiceTests
 {
     [Fact]
     public async Task VerifyLogin_StoresTokensServerSide_AndReturnsTokenlessSession()

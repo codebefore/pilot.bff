@@ -73,12 +73,7 @@ public sealed class BffProxyIntegrationTests : IClassFixture<WebApplicationFacto
         Assert.False(gateway.Request.Headers.Contains("X-Forwarded-For"));
         Assert.Null(response.Headers.Location);
         Assert.False(response.Headers.Contains("X-Internal-Secret"));
-        Assert.Contains(
-            response.Headers.GetValues("Set-Cookie"),
-            value => value.StartsWith("__Host-pilot_session=", StringComparison.Ordinal));
-        Assert.DoesNotContain(
-            response.Headers.GetValues("Set-Cookie"),
-            value => value.Contains("upstream=bad", StringComparison.Ordinal));
+        Assert.False(response.Headers.Contains("Set-Cookie"));
     }
 
     [Fact]
@@ -210,9 +205,7 @@ public sealed class BffProxyIntegrationTests : IClassFixture<WebApplicationFacto
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
         Assert.True(store.Deleted);
-        Assert.Contains(
-            response.Headers.GetValues("Set-Cookie"),
-            value => value.StartsWith("__Host-pilot_session=;", StringComparison.Ordinal));
+        Assert.False(response.Headers.Contains("Set-Cookie"));
     }
 
     [Fact]

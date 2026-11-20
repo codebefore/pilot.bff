@@ -52,8 +52,6 @@ public static class BffAuthEndpoints
                     loggerFactory.CreateLogger("Pilot.Bff.Security"),
                     "release_grant_rejected");
             }
-            if (result.StatusCode == HttpStatusCode.Unauthorized)
-                cookie.Delete(context.Response);
             return result.Value is not null ? Results.Ok(result.Value) : Status(result.StatusCode);
         }
         catch (Exception exception) when (IsDependencyFailure(exception, cancellationToken))
@@ -77,11 +75,6 @@ public static class BffAuthEndpoints
                 cookie.Read(context.Request),
                 cancellationToken);
             InstitutionTelemetryContext.Set(context, result.InstitutionId);
-            if (result.StatusCode == HttpStatusCode.Unauthorized)
-            {
-                cookie.Delete(context.Response);
-            }
-
             return result.StatusCode == HttpStatusCode.OK && result.Value is not null
                 ? Results.Ok(result.Value)
                 : Status(result.StatusCode);
@@ -155,7 +148,7 @@ public static class BffAuthEndpoints
                 result.SessionId is not null)
             {
                 InstitutionTelemetryContext.Set(context, result.Value.ActiveInstitution?.Id);
-                cookie.Append(context.Response, result.SessionId, result.Value.IdleExpiresAtUtc);
+                cookie.Append(context.Response, result.SessionId, result.Value.AbsoluteExpiresAtUtc);
                 return Results.Ok(result.Value);
             }
 
@@ -179,13 +172,7 @@ public static class BffAuthEndpoints
             if (result.StatusCode == HttpStatusCode.OK && result.Value is not null)
             {
                 InstitutionTelemetryContext.Set(context, result.Value.ActiveInstitution?.Id);
-                cookie.Append(context.Response, result.SessionId!, result.Value.IdleExpiresAtUtc);
                 return Results.Ok(result.Value);
-            }
-
-            if (result.StatusCode == HttpStatusCode.Unauthorized)
-            {
-                cookie.Delete(context.Response);
             }
 
             return Status(result.StatusCode);
@@ -214,13 +201,8 @@ public static class BffAuthEndpoints
                 result.SessionId is not null)
             {
                 InstitutionTelemetryContext.Set(context, result.Value.ActiveInstitution?.Id);
-                cookie.Append(context.Response, result.SessionId, result.Value.IdleExpiresAtUtc);
+                cookie.Append(context.Response, result.SessionId, result.Value.AbsoluteExpiresAtUtc);
                 return Results.Ok(result.Value);
-            }
-
-            if (result.StatusCode == HttpStatusCode.Unauthorized)
-            {
-                cookie.Delete(context.Response);
             }
 
             return Status(result.StatusCode);

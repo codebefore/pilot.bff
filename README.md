@@ -74,6 +74,8 @@ Session verisinin Redis TTL'i idle timeout, mutlak session süresi ve Identity r
 
 Kurum değişimi yeni browser session id üretir ve Redis'teki eski-yeni anahtar geçişi atomik yapılır. OTP doğrulamasından sonra Redis yazımı başarısız olursa yeni Identity refresh tokenı best-effort logout ile geri alınır.
 
+Tarayıcının oturum çerezini başarılı OTP doğrulaması ve başarılı kurum seçimi yazar. Çerez mevcut mutlak bitişi taşır. Açık çıkış isteği çerezi siler. Proxy ve oturum sorguları yalnızca kendi isteklerine ait sunucu oturumu üzerinde işlem yapar. Böylece geç gelen eski kurum yanıtları yeni çerezi değiştiremez.
+
 Access token süresi dolmadan önce yenileme, session başına Redis dağıtık kilidi altında yapılır. Kilit sahibi session kaydını tekrar okur; aynı anda gelen istekler dönen yeni kaydı kullanır ve Identity'ye ikinci refresh göndermez. Refresh ve idle touch yalnız anahtar hâlâ varsa atomik güncelleme yapar; logout veya rotation ile silinen session yeniden oluşturulmaz. Logout ve kurum değişimi de aynı session kilidini kullanır. Kilit alınamazsa `503` dönülür ve browser token fallback'i oluşmaz.
 
 Bu akışların unit/race testleri ile gerçek Redis üzerinde çoklu replica key-ring/session round-trip, dağıtık lock, atomik rotation, Redis kesintisinde fail-closed davranış ve PFX rollover testi hazırdır. Özellik yine varsayılan kapalıdır.

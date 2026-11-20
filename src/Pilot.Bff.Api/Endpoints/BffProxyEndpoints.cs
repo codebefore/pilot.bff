@@ -76,16 +76,10 @@ public static class BffProxyEndpoints
             cancellationToken);
         if (authorization.StatusCode != System.Net.HttpStatusCode.OK || authorization.Value is null)
         {
-            if (authorization.StatusCode == System.Net.HttpStatusCode.Unauthorized)
-            {
-                cookie.Delete(context.Response);
-            }
-
             return Results.StatusCode((int)authorization.StatusCode);
         }
 
         InstitutionTelemetryContext.Set(context, authorization.Value.InstitutionId);
-        cookie.Append(context.Response, authorization.SessionId!, authorization.Value.IdleExpiresAtUtc);
         var trafficKind = routePolicy.ClassifyTraffic(context.Request.Method, targetPath);
         await using var trafficLease = await trafficLimiter.TryAcquireAsync(
             authorization.Value.UserId,
@@ -144,7 +138,6 @@ public static class BffProxyEndpoints
             if (upstreamResponse.StatusCode == System.Net.HttpStatusCode.Unauthorized)
             {
                 await auth.InvalidateLocalSessionAsync(authorization.SessionId, CancellationToken.None);
-                cookie.Delete(context.Response);
             }
 
             context.Response.StatusCode = (int)upstreamResponse.StatusCode;
