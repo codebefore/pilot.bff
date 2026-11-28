@@ -41,7 +41,7 @@ public interface IIdentityAuthClient
     Task<HttpStatusCode> LogoutAsync(string refreshToken, CancellationToken cancellationToken);
 }
 
-public sealed class IdentityAuthClient(HttpClient httpClient) : IIdentityAuthClient
+public sealed class IdentityAuthClient(HttpClient httpClient, IHttpContextAccessor httpContextAccessor) : IIdentityAuthClient
 {
     public Task<IdentityAuthResult<LoginOtpChallengeResponse>> RequestLoginCodeAsync(
         LoginOtpRequest request,
@@ -64,7 +64,8 @@ public sealed class IdentityAuthClient(HttpClient httpClient) : IIdentityAuthCli
             "api/auth/login/verify-code",
             request,
             accessToken: null,
-            cancellationToken);
+            cancellationToken,
+            includeUserAgent: true);
     }
 
     public Task<IdentityAuthResult<IdentityLoginResponse>> SelectInstitutionAsync(
@@ -77,7 +78,8 @@ public sealed class IdentityAuthClient(HttpClient httpClient) : IIdentityAuthCli
             $"api/auth/institutions/{institutionId:D}/select",
             new { },
             accessToken,
-            cancellationToken);
+            cancellationToken,
+            includeUserAgent: true);
     }
 
     public Task<IdentityAuthResult<IdentityLoginResponse>> RefreshAsync(
@@ -89,7 +91,8 @@ public sealed class IdentityAuthClient(HttpClient httpClient) : IIdentityAuthCli
             "api/auth/refresh",
             new RefreshTokenRequest(refreshToken),
             accessToken: null,
-            cancellationToken);
+            cancellationToken,
+            includeUserAgent: true);
     }
 
     public Task<IdentityAuthResult<MigrationAccessChallengeResponse>> RequestMigrationAccessCodeAsync(
@@ -137,12 +140,20 @@ public sealed class IdentityAuthClient(HttpClient httpClient) : IIdentityAuthCli
         string path,
         object body,
         string? accessToken,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        bool includeUserAgent = false)
     {
         using var request = new HttpRequestMessage(method, path)
         {
             Content = JsonContent.Create(body)
         };
+
+        if (includeUserAgent)
+        {
+            var userAgent = httpContextAccessor.HttpContext?.Request.Headers.UserAgent.ToString();
+            if (userAgent is { Length: > 0 and <= 1024 } && userAgent.All(c => c is >= ' ' and <= '~'))
+                request.Headers.UserAgent.TryParseAdd(userAgent);
+        }
 
         if (!string.IsNullOrWhiteSpace(accessToken))
         {

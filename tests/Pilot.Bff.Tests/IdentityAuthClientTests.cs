@@ -1,6 +1,7 @@
 using System.Net;
 using System.Text;
 using System.Text.Json;
+using Microsoft.AspNetCore.Http;
 using Pilot.Bff.Api.Auth;
 using Pilot.Bff.Api.Contracts;
 
@@ -8,6 +9,16 @@ namespace Pilot.Bff.Tests;
 
 public sealed class IdentityAuthClientTests
 {
+    private const string BrowserAgent = "Mozilla/5.0 (Windows NT 10.0) Chrome/120.0 Safari/537.36";
+
+    private static HttpContextAccessor BrowserContext(string userAgent)
+    {
+        var context = new DefaultHttpContext();
+        context.Request.Headers.UserAgent = userAgent;
+        context.Request.Headers.Authorization = "Bearer browser-token";
+        return new HttpContextAccessor { HttpContext = context };
+    }
+
     [Fact]
     public async Task SelectInstitution_UsesFixedIdentityPathAndServerBearerToken()
     {
@@ -17,7 +28,7 @@ public sealed class IdentityAuthClientTests
         var client = new IdentityAuthClient(new HttpClient(handler)
         {
             BaseAddress = new Uri("http://pilot-identity/")
-        });
+        }, BrowserContext(BrowserAgent));
 
         var result = await client.SelectInstitutionAsync(
             institutionId,
@@ -28,16 +39,20 @@ public sealed class IdentityAuthClientTests
         Assert.Equal($"http://pilot-identity/api/auth/institutions/{institutionId:D}/select", handler.Uri?.ToString());
         Assert.Equal("Bearer", handler.AuthorizationScheme);
         Assert.Equal("server-side-access-token", handler.AuthorizationParameter);
+        Assert.Equal(BrowserAgent, handler.UserAgent);
     }
 
-    [Fact]
-    public async Task VerifyLogin_RejectsEmptySuccessPayloadAsBadGateway()
+    [Theory]
+    [InlineData(BrowserAgent, BrowserAgent)]
+    [InlineData("", "")]
+    [InlineData("invalid\r\nvalue", "")]
+    public async Task VerifyLogin_ForwardsValidAgentAndRejectsEmptySuccessPayload(string agent, string expected)
     {
         var handler = new RecordingHandler("null");
         var client = new IdentityAuthClient(new HttpClient(handler)
         {
             BaseAddress = new Uri("http://pilot-identity/")
-        });
+        }, BrowserContext(agent));
 
         var result = await client.VerifyLoginCodeAsync(
             new VerifyLoginOtpRequest("905001112233", "123456"),
@@ -45,6 +60,8 @@ public sealed class IdentityAuthClientTests
 
         Assert.Equal(HttpStatusCode.BadGateway, result.StatusCode);
         Assert.Null(result.Value);
+        Assert.Equal(expected, handler.UserAgent);
+        Assert.Null(handler.AuthorizationScheme);
     }
 
     [Fact]
@@ -55,7 +72,7 @@ public sealed class IdentityAuthClientTests
         var client = new IdentityAuthClient(new HttpClient(handler)
         {
             BaseAddress = new Uri("http://pilot-identity/")
-        });
+        }, BrowserContext(BrowserAgent));
 
         var result = await client.RefreshAsync("server-side-refresh-token", CancellationToken.None);
 
@@ -63,6 +80,7 @@ public sealed class IdentityAuthClientTests
         Assert.Equal("http://pilot-identity/api/auth/refresh", handler.Uri?.ToString());
         Assert.Null(handler.AuthorizationScheme);
         Assert.Contains("server-side-refresh-token", handler.Body, StringComparison.Ordinal);
+        Assert.Equal(BrowserAgent, handler.UserAgent);
     }
 
     private static IdentityLoginResponse CreateLoginResponse(Guid institutionId)
@@ -92,12 +110,14 @@ public sealed class IdentityAuthClientTests
         public string? AuthorizationParameter { get; private set; }
 
         public string? Body { get; private set; }
+        public string? UserAgent { get; private set; }
 
         protected override async Task<HttpResponseMessage> SendAsync(
             HttpRequestMessage request,
             CancellationToken cancellationToken)
         {
             Uri = request.RequestUri;
+            UserAgent = request.Headers.UserAgent.ToString();
             AuthorizationScheme = request.Headers.Authorization?.Scheme;
             AuthorizationParameter = request.Headers.Authorization?.Parameter;
             Body = request.Content is null
